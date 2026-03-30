@@ -9,22 +9,11 @@ import json
 
 from expert_dataset import ExpertDataset
 from agent_policy import AgentPolicy
-from carla_gym.envs import EndlessEnv
 from rl_birdview_wrapper import RlBirdviewWrapper
 from data_collect import reward_configs, terminal_configs, obs_configs
-from eval_agent import evaluate_policy
-from stable_baselines3.common.vec_env import SubprocVecEnv
 
 
-env_configs = {
-    'carla_map': 'Town01',
-    'num_zombie_vehicles': [0, 150],
-    'num_zombie_walkers': [0, 300],
-    'weather_group': 'dynamic_1.0'
-}
-
-
-def learn_bc(policy, device, expert_loader, eval_loader, env, resume_last_train):
+def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
     output_dir = Path('outputs')
     output_dir.mkdir(parents=True, exist_ok=True)
     last_checkpoint_path = output_dir / 'checkpoint.txt'
@@ -115,14 +104,6 @@ def learn_bc(policy, device, expert_loader, eval_loader, env, resume_last_train)
             'eval_loss': eval_loss,
         }, step=i_steps)
 
-        if i_steps - steps_last_eval > eval_step:
-            eval_video_path = (video_path / f'bc_eval_{i_steps}.mp4').as_posix()
-            avg_ep_stat, avg_route_completion, ep_events = evaluate_policy(env, policy, eval_video_path)
-            env.reset()
-            wandb.log(avg_ep_stat, step=i_steps)
-            wandb.log(avg_route_completion, step=i_steps)
-            steps_last_eval = i_steps
-
         if min_eval_loss > eval_loss:
             ckpt_path = (ckpt_dir / f'bc_ckpt_{i_episode}_min_eval.pth').as_posix()
             th.save(
@@ -143,17 +124,7 @@ def learn_bc(policy, device, expert_loader, eval_loader, env, resume_last_train)
     run = run.finish()
 
 
-def env_maker():
-    cfg = json.load(open("config.json", "r"))
-    env = EndlessEnv(obs_configs=obs_configs, reward_configs=reward_configs,
-                    terminal_configs=terminal_configs, host='localhost', port=cfg['port'],
-                    seed=2021, no_rendering=True, **env_configs)
-    env = RlBirdviewWrapper(env)
-    return env
-
 if __name__ == '__main__':
-    env = SubprocVecEnv([env_maker])
-
     resume_last_train = False
 
     observation_space = {}
@@ -201,4 +172,4 @@ if __name__ == '__main__':
         shuffle=True,
     )
 
-    learn_bc(policy, device, gail_train_loader, gail_val_loader, env, resume_last_train)
+    learn_bc(policy, device, gail_train_loader, gail_val_loader, resume_last_train)
