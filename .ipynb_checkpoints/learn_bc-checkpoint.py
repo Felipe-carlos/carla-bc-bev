@@ -11,7 +11,7 @@ import os
 
 from expert_dataset_def.expert_dataset import ExpertDataset
 from agent_policy import AgentPolicy
-from bev_generation.unet import Unet_BEVGenerator
+from bev_generation.cvt_3ch import CVT_3chL1Generator
 from dotenv import load_dotenv
 
 
@@ -24,7 +24,7 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
     output_dir.mkdir(parents=True, exist_ok=True)
     last_checkpoint_path = output_dir / 'checkpoint.txt'
 
-    bev_generator = Unet_BEVGenerator(device=device)
+    bev_generator = CVT_3chL1Generator(device=device)
     project_name = f'bev_bc-{bev_generator.__name__()}'
 
     ckpt_dir = Path(f'ckpts/ckpt-{bev_generator.__name__()}')
@@ -33,7 +33,7 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
     if resume_last_train:
         with open(last_checkpoint_path, 'r') as f:
             wb_run_path = f.read()
-        #wandb.login(key=API_KEY)
+        wandb.login(key=API_KEY)
         api = wandb.Api()
         wandb_run = api.run(wb_run_path)
         wandb_run_id = wandb_run.id
@@ -72,7 +72,7 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
             expert_obs_dict, expert_action = expert_batch
            
             bev = bev_generator.infer(expert_obs_dict)
-            
+                        
             obs_tensor_dict = {
                 'state': expert_obs_dict['state'].float().to(device),
                 'birdview': bev.to(device)
@@ -165,14 +165,14 @@ if __name__ == '__main__':
     policy = AgentPolicy(**policy_kwargs)
     policy.to(device)
 
-    batch_size = 1024
+    batch_size = 128
 
     gail_train_loader = th.utils.data.DataLoader(
         ExpertDataset(
             'expert-data',
             routes=range(2, 10),
             n_eps=1,
-            unet=True
+            unet=False
         ),
         batch_size=batch_size,
         shuffle=True,
@@ -183,7 +183,7 @@ if __name__ == '__main__':
             'expert-data',
             routes=[0,1],
             n_eps=1,
-            unet=True
+            unet=False
             
         ),
         batch_size=batch_size,

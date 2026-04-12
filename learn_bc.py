@@ -165,7 +165,7 @@ if __name__ == '__main__':
     policy = AgentPolicy(**policy_kwargs)
     policy.to(device)
 
-    batch_size = 512
+    batch_size = 128
 
     gail_train_loader = th.utils.data.DataLoader(
         ExpertDataset(
