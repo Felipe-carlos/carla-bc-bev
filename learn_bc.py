@@ -33,7 +33,7 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
     if resume_last_train:
         with open(last_checkpoint_path, 'r') as f:
             wb_run_path = f.read()
-        #wandb.login(key=API_KEY)
+        wandb.login(key=API_KEY)
         api = wandb.Api()
         wandb_run = api.run(wb_run_path)
         wandb_run_id = wandb_run.id
@@ -165,7 +165,7 @@ if __name__ == '__main__':
     policy = AgentPolicy(**policy_kwargs)
     policy.to(device)
 
-    batch_size = 1024
+    batch_size = 512
 
     gail_train_loader = th.utils.data.DataLoader(
         ExpertDataset(

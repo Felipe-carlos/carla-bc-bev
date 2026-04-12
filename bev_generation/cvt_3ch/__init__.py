@@ -13,7 +13,7 @@ class CVT_3chL1Generator(IBEVGenerator):
             model_path = os.path.join(main, 'bev_generation/cvt_3ch/ckpts/4_cam_l1/ckpt_49.pth')
         else:
             model_path = model_path
-
+        self.device = device
         self.image_height = 256  ##
         self.image_width = 256  ##
         self.bev_resolution = 256
@@ -88,7 +88,8 @@ class CVT_3chL1Generator(IBEVGenerator):
             expert_obs_dict precisa conter as chaves  'image', 'extrinsics','intrinsics'
         """
         with torch.no_grad():
-            fake_birdview = self.generator(expert_obs_dict)
+            batch = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v for k, v in expert_obs_dict.items()}
+            fake_birdview = self.generator(batch)
             # Resize: (4, 3, 256, 256) → (4, 3, 192, 192)
             fake_birdview = torch.nn.functional.interpolate(
             fake_birdview,
