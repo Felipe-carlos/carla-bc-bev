@@ -45,6 +45,6 @@ class Unet_BEVGenerator(IBEVGenerator):
             # Gerar imagem fake (com U-Net)
             fake_birdview = self.generator(expert_obs_dict['image']) 
             fake_birdview = (fake_birdview > 0.5).byte()  # Binarizar a saída
-
+            fake_birdview = fake_birdview *255 # Converter para 0 e 255
         return fake_birdview
 

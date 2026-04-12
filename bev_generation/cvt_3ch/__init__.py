@@ -89,6 +89,7 @@ class CVT_3chL1Generator(IBEVGenerator):
         with torch.no_grad():
             fake_birdview = self.generator(expert_obs_dict)
             fake_birdview = (fake_birdview > 0.5).byte()
+            fake_birdview = fake_birdview *255 # Converter para 0 e 255
 
         return fake_birdview
 

@@ -35,7 +35,7 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
     if resume_last_train:
         with open(last_checkpoint_path, 'r') as f:
             wb_run_path = f.read()
-        wandb.login(key=API_KEY)
+        #wandb.login(key=API_KEY)
         api = wandb.Api()
         wandb_run = api.run(wb_run_path)
         wandb_run_id = wandb_run.id
@@ -74,7 +74,7 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
             expert_obs_dict, expert_action = expert_batch
            
             bev = bev_generator.infer(expert_obs_dict)
-
+            print(bev.max(), bev.min())
             obs_tensor_dict = {
                 'state': expert_obs_dict['state'].float().to(device),
                 'birdview': bev.to(device)
@@ -99,7 +99,7 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
         for expert_batch in eval_loader:
             expert_obs_dict, expert_action = expert_batch
             bev = bev_generator.infer(expert_obs_dict)
-
+            
             obs_tensor_dict = {
                 'state': expert_obs_dict['state'].float().to(device),
                 'birdview': bev.to(device)
@@ -146,7 +146,7 @@ if __name__ == '__main__':
     resume_last_train = False
 
     observation_space = {}
-    observation_space['birdview'] = gym.spaces.Box(low=0, high=1, shape=(3, 192, 192), dtype=np.uint8)
+    observation_space['birdview'] = gym.spaces.Box(low=0, high=255, shape=(3, 192, 192), dtype=np.uint8)
     observation_space['state'] = gym.spaces.Box(low=-10.0, high=30.0, shape=(6,), dtype=np.float32)
     observation_space = gym.spaces.Dict(**observation_space)
 
@@ -167,7 +167,7 @@ if __name__ == '__main__':
     policy = AgentPolicy(**policy_kwargs)
     policy.to(device)
 
-    batch_size = 64
+    batch_size = 256
 
     gail_train_loader = th.utils.data.DataLoader(
         ExpertDataset(
