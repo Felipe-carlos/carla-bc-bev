@@ -11,7 +11,7 @@ import os
 
 from expert_dataset_def.expert_dataset import ExpertDataset
 from agent_policy import AgentPolicy
-from bev_generation.unet import Unet_BEVGenerator
+from bev_generation.cvt_3ch import CVT_3chL1Generator
 from dotenv import load_dotenv
 
 
@@ -24,7 +24,7 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
     output_dir.mkdir(parents=True, exist_ok=True)
     last_checkpoint_path = output_dir / 'checkpoint.txt'
 
-    bev_generator = Unet_BEVGenerator(device=device)
+    bev_generator = CVT_3chL1Generator(device=device)
     project_name = f'bev_bc-{bev_generator.__name__()}'
 
     ckpt_dir = Path(f'ckpts/ckpt-{bev_generator.__name__()}')
