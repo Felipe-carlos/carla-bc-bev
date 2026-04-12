@@ -72,7 +72,7 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
             expert_obs_dict, expert_action = expert_batch
            
             bev = bev_generator.infer(expert_obs_dict)
-            
+                        
             obs_tensor_dict = {
                 'state': expert_obs_dict['state'].float().to(device),
                 'birdview': bev.to(device)
@@ -172,7 +172,7 @@ if __name__ == '__main__':
             'expert-data',
             routes=range(2, 10),
             n_eps=1,
-            unet=True
+            unet=False
         ),
         batch_size=batch_size,
         shuffle=True,
@@ -183,7 +183,7 @@ if __name__ == '__main__':
             'expert-data',
             routes=[0,1],
             n_eps=1,
-            unet=True
+            unet=False
             
         ),
         batch_size=batch_size,

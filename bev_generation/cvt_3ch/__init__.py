@@ -88,8 +88,15 @@ class CVT_3chL1Generator(IBEVGenerator):
         """
         with torch.no_grad():
             fake_birdview = self.generator(expert_obs_dict)
-            fake_birdview = (fake_birdview > 0.5).byte()
-            fake_birdview = fake_birdview *255 # Converter para 0 e 255
+            # Resize: (4, 3, 256, 256) → (4, 3, 192, 192)
+            fake_birdview = torch.nn.functional.interpolate(
+            fake_birdview,
+            size=(192, 192),
+            mode='bilinear',   # melhor para imagens
+            align_corners=False
+            )
 
+        fake_birdview = (fake_birdview > 0.5).byte()
+        fake_birdview = fake_birdview * 255
         return fake_birdview
 
