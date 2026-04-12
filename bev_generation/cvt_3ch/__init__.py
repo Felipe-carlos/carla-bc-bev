@@ -70,13 +70,14 @@ class CVT_3chL1Generator(IBEVGenerator):
         )
         state_dict = torch.load(model_path)
         self.generator.load_state_dict(state_dict['network_state_dict'])
+        self.generator.to(device)
 
         if use_eval:
             self.generator.eval()
 
 
     def __name__(self):
-        return "unet"
+        return "cvt_3ch_L1"
         
     def infer(self, expert_obs_dict):
         """
