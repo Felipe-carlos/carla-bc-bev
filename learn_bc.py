@@ -11,8 +11,6 @@ import os
 
 from expert_dataset_def.expert_dataset import ExpertDataset
 from agent_policy import AgentPolicy
-from rl_birdview_wrapper import RlBirdviewWrapper
-from data_collect import reward_configs, terminal_configs, obs_configs
 from bev_generation.unet import Unet_BEVGenerator
 from dotenv import load_dotenv
 
