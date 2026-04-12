@@ -6,3 +6,7 @@ outputs
 wandb
 *.pyc
 screenlog.0
+api_carla/
+expert-data
+ckpts
+Gifs_Expert_Dataset

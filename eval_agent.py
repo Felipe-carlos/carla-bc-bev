@@ -1,14 +1,68 @@
 import numpy as np
 import time
 from gym.wrappers.monitoring.video_recorder import ImageEncoder
+from bev_generation.unet import Unet_BEVGenerator
+from pathlib import Path
+import cv2 
+import torch as th
+from typing import Literal
 
 
-def evaluate_policy(env, policy, video_path, min_eval_steps=3000):
+
+def create_image_tensor(obs, unet=False, w_resize=192, h_resize=192):
+
+    def process_image(image: np.ndarray, traj=False):
+
+        if image.ndim == 4:
+            image = image[0]
+
+        if not traj:
+            image = image.transpose(1, 2, 0)
+            image = cv2.resize(image, (w_resize, h_resize),interpolation=cv2.INTER_NEAREST)
+            image = image.transpose(2, 0, 1)
+        else:
+            if image.ndim == 3:
+                image = image[0]
+
+            image = cv2.resize(image, (w_resize, h_resize),interpolation=cv2.INTER_NEAREST)
+            image = image[None, :, :]
+
+        return th.as_tensor(image, dtype=th.float32) / 255.0
+
+    image_tensor_list = []
+
+    
+
+    if unet:
+        traj_plot = process_image(obs['traj_plot'], traj=True)
+        camera_order = ["central_rgb", "left_rgb", "right_rgb", "rear_rgb"]
+    else:
+        camera_order = ["left_rgb", "central_rgb", "right_rgb", "rear_rgb"]
+        traj_plot = process_image(obs['traj_plot_rgb'], traj=True)
+
+    for i in camera_order:
+        image_tensor_list.append(process_image(obs[i]))
+
+    image_tensor_list.append(traj_plot)
+
+    images = th.cat(image_tensor_list, dim=0)
+
+    return images.unsqueeze(0)
+
+def evaluate_policy(env, policy, video_path, min_eval_steps=3000, arc:Literal['unet', 'cvt', 'expert']='unet'):
+    device = 'cuda'
+    if arc != 'expert':
+        output_dir = Path('outputs')
+        
+        last_checkpoint_path = output_dir / 'checkpoint.txt'
+        bev_generator = Unet_BEVGenerator(device=device)
+
     policy = policy.eval()
     t0 = time.time()
     for i in range(env.num_envs):
         env.set_attr('eval_mode', True, indices=i)
     obs = env.reset()
+    
 
     list_render = []
     ep_stat_buffer = []
@@ -22,6 +76,14 @@ def evaluate_policy(env, policy, video_path, min_eval_steps=3000):
     env_done = np.array([False]*env.num_envs)
     # while n_step < min_eval_steps:
     while n_step < min_eval_steps or not np.all(env_done):
+        
+        if arc != 'expert':
+            unet = arc == 'unet'
+            image_input = {'image': create_image_tensor(obs,unet=unet).to(device)}
+            
+            bev = bev_generator.infer(image_input)
+            obs['birdview'] = bev
+        
         actions, log_probs, mu, sigma, _ = policy.forward(obs, deterministic=True, clip_action=True)
         obs, reward, done, info = env.step(actions)
 

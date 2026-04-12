@@ -98,9 +98,10 @@ class AgentPolicy(nn.Module):
         :param birdview: th.Tensor (num_envs, frame_stack*channel, height, width)
         :param state: th.Tensor (num_envs, state_dim)
         """
+        
         state = obs_dict['state']
 
-        birdview = obs_dict['birdview'].float() / 255.0
+        birdview = obs_dict['birdview'].float() 
         features = self.features_extractor(birdview, state)
 
         return features
@@ -127,6 +128,7 @@ class AgentPolicy(nn.Module):
         used in collect_rollouts(), do not clamp actions
         '''
         with th.no_grad():
+            
             obs_tensor_dict = dict([(k, th.as_tensor(v).to(self.device)) for k, v in obs_dict.items()])
             features = self._get_features(obs_tensor_dict)
             distribution, mu, sigma = self._get_action_dist_from_features(features)

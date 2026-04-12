@@ -7,13 +7,13 @@ import wandb
 import gym
 import json
 
-from expert_dataset import ExpertDataset
+
 from agent_policy import AgentPolicy
 from carla_gym.envs import EndlessEnv
 from rl_birdview_wrapper import RlBirdviewWrapper
 from data_collect import reward_configs, terminal_configs, obs_configs
 from eval_agent import evaluate_policy
-from stable_baselines3.common.vec_env import SubprocVecEnv
+from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
 
 
 env_configs = {
@@ -24,8 +24,8 @@ env_configs = {
 }
 
 
-def eval_bc(policy, device, env):
-    ckpt_dir = Path('ckpt')
+def eval_bc(policy, device, env,eval_name, bev_arc='unet'):
+    ckpt_dir = Path(f'ckpt/ckpt-{eval_name}')
 
     ckpt_path = (ckpt_dir / 'ckpt_latest.pth').as_posix()
     saved_variables = th.load(ckpt_path, map_location='cuda')
@@ -35,24 +35,32 @@ def eval_bc(policy, device, env):
     video_path = Path('video')
     video_path.mkdir(parents=True, exist_ok=True)
 
-    eval_video_path = (video_path / f'bc_eval.mp4').as_posix()
-    avg_ep_stat, avg_route_completion, ep_events = evaluate_policy(env, policy, eval_video_path)
+    eval_video_path = (video_path / f'{eval_name}_{bev_arc}.mp4').as_posix()
+    avg_ep_stat, avg_route_completion, ep_events = evaluate_policy(env, policy, eval_video_path, arc=bev_arc)
+  
+
+    with open(f'eval_metrics/{eval_name}_{bev_arc}.json', 'w') as f:
+        json.dump({
+            'avg_ep_stat': avg_ep_stat,
+            'avg_route_completion': avg_route_completion
+        }, f, indent=4)
     env.reset()
+    
 
 
 def env_maker():
-    cfg = json.load(open("config.json", "r"))
+    cfg = json.load(open("config/carla_config.json", "r"))
     env = EndlessEnv(obs_configs=obs_configs, reward_configs=reward_configs,
-                    terminal_configs=terminal_configs, host='localhost', port=cfg['port'],
-                    seed=2021, no_rendering=True, **env_configs)
-    env = RlBirdviewWrapper(env)
+                    terminal_configs=terminal_configs, host=cfg['host'], port=cfg['port'],
+                    seed=2021, no_rendering=False, **env_configs)
+    env = RlBirdviewWrapper(env,input_states=['rgb', 'traj', 'state'], acc_as_action=True)
     return env
 
 if __name__ == '__main__':
-    env = SubprocVecEnv([env_maker])
+    env = DummyVecEnv([env_maker])
 
     observation_space = {}
-    observation_space['birdview'] = gym.spaces.Box(low=0, high=255, shape=(3, 192, 192), dtype=np.uint8)
+    observation_space['birdview'] = gym.spaces.Box(low=0, high=1, shape=(3, 192, 192), dtype=np.uint8)
     observation_space['state'] = gym.spaces.Box(low=-10.0, high=30.0, shape=(6,), dtype=np.float32)
     observation_space = gym.spaces.Dict(**observation_space)
 

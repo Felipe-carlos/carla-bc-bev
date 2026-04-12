@@ -6,24 +6,36 @@ from pathlib import Path
 import wandb
 import gym
 import json
+import os
 
-from expert_dataset import ExpertDataset
+
+from expert_dataset_def.expert_dataset import ExpertDataset
 from agent_policy import AgentPolicy
 from rl_birdview_wrapper import RlBirdviewWrapper
 from data_collect import reward_configs, terminal_configs, obs_configs
+from bev_generation.unet import Unet_BEVGenerator
+from dotenv import load_dotenv
 
+
+load_dotenv()
+
+API_KEY = os.getenv('WANDB_API_KEY')
 
 def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
     output_dir = Path('outputs')
     output_dir.mkdir(parents=True, exist_ok=True)
     last_checkpoint_path = output_dir / 'checkpoint.txt'
 
-    ckpt_dir = Path('ckpt')
+    bev_generator = Unet_BEVGenerator(device=device)
+    project_name = f'bev_bc-{bev_generator.__name__()}'
+
+    ckpt_dir = Path(f'ckpts/ckpt-{bev_generator.__name__()}')
     ckpt_dir.mkdir(parents=True, exist_ok=True)
 
     if resume_last_train:
         with open(last_checkpoint_path, 'r') as f:
             wb_run_path = f.read()
+        wandb.login(key=API_KEY)
         api = wandb.Api()
         wandb_run = api.run(wb_run_path)
         wandb_run_id = wandb_run.id
@@ -32,11 +44,11 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
         train_kwargs = saved_variables['train_init_kwargs']
         start_ep = train_kwargs['start_ep']
         i_steps = train_kwargs['i_steps']
-
+         
         policy.load_state_dict(saved_variables['policy_state_dict'])
-        wandb.init(project='gail-carla2', id=wandb_run_id, resume='must')
+        wandb.init(project=project_name, id=wandb_run_id, resume='must')
     else:
-        run = wandb.init(project='gail-carla2', reinit=True)
+        run = wandb.init(project=project_name, reinit=True)
         with open(last_checkpoint_path, 'w') as log_file:
             log_file.write(wandb.run.path)
         start_ep = 0
@@ -46,22 +58,26 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
     video_path.mkdir(parents=True, exist_ok=True)
 
     optimizer = optim.Adam(policy.parameters(), lr=1e-5)
-    episodes = 200
+    episodes = 400
     ent_weight = 0.01
     min_eval_loss = np.inf
     eval_step = int(1e5)
     steps_last_eval = 0
 
-    for i_episode in tqdm.tqdm(range(start_ep, episodes)):
+    
+    for i_episode in tqdm.tqdm(range(start_ep, episodes),'Episode:'):
         total_loss = 0
         i_batch = 0
         policy = policy.train()
         # Expert dataset
-        for expert_batch in expert_loader:
+        for expert_batch in tqdm.tqdm(expert_loader,'Batches:'):
             expert_obs_dict, expert_action = expert_batch
+           
+            bev = bev_generator.infer(expert_obs_dict)
+
             obs_tensor_dict = {
                 'state': expert_obs_dict['state'].float().to(device),
-                'birdview': expert_obs_dict['birdview'].float().to(device)
+                'birdview': bev.to(device)
             }
             expert_action = expert_action.to(device)
 
@@ -82,9 +98,11 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
         i_eval_batch = 0
         for expert_batch in eval_loader:
             expert_obs_dict, expert_action = expert_batch
+            bev = bev_generator.infer(expert_obs_dict)
+
             obs_tensor_dict = {
                 'state': expert_obs_dict['state'].float().to(device),
-                'birdview': expert_obs_dict['birdview'].float().to(device)
+                'birdview': bev.to(device)
             }
             expert_action = expert_action.to(device)
 
@@ -128,7 +146,7 @@ if __name__ == '__main__':
     resume_last_train = False
 
     observation_space = {}
-    observation_space['birdview'] = gym.spaces.Box(low=0, high=255, shape=(3, 192, 192), dtype=np.uint8)
+    observation_space['birdview'] = gym.spaces.Box(low=0, high=1, shape=(3, 192, 192), dtype=np.uint8)
     observation_space['state'] = gym.spaces.Box(low=-10.0, high=30.0, shape=(6,), dtype=np.float32)
     observation_space = gym.spaces.Dict(**observation_space)
 
@@ -149,13 +167,14 @@ if __name__ == '__main__':
     policy = AgentPolicy(**policy_kwargs)
     policy.to(device)
 
-    batch_size = 24
+    batch_size = 64
 
     gail_train_loader = th.utils.data.DataLoader(
         ExpertDataset(
-            'gail_experts',
-            n_routes=8,
+            'expert-data',
+            routes=range(2, 10),
             n_eps=1,
+            unet=True
         ),
         batch_size=batch_size,
         shuffle=True,
@@ -163,10 +182,11 @@ if __name__ == '__main__':
     
     gail_val_loader = th.utils.data.DataLoader(
         ExpertDataset(
-            'gail_experts',
-            n_routes=2,
+            'expert-data',
+            routes=[0,1],
             n_eps=1,
-            route_start=8
+            unet=True
+            
         ),
         batch_size=batch_size,
         shuffle=True,
