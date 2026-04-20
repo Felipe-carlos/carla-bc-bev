@@ -1,0 +1,16 @@
+{
+    "avg_ep_stat": {
+        "eval/completed_n_episodes": 0.0,
+        "eval/eval_timeout": 1,
+        "time/t_eval": 611.750785112381,
+        "time/fps_eval": 19.615830975673457
+    },
+    "avg_route_completion": {
+        "eval/step": 12000.0,
+        "eval/simulation_time": 1200.0000178813934,
+        "eval/route_completed_in_m": 3740.6027289819576,
+        "eval/route_length_in_m": 4082.471004564748,
+        "eval/is_route_completed": 0.0,
+        "eval/avg_n_episodes": 1.0
+    }
+}

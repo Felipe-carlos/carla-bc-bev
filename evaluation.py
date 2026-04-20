@@ -15,9 +15,9 @@ from data_collect import reward_configs, terminal_configs, obs_configs
 from eval_agent import evaluate_policy
 from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
 
-
+TOWN_NAME = 'Town02'
 env_configs = {
-    'carla_map': 'Town01',
+    'carla_map': TOWN_NAME,
     'num_zombie_vehicles': [0, 150],
     'num_zombie_walkers': [0, 300],
     'weather_group': 'dynamic_1.0'
@@ -25,21 +25,21 @@ env_configs = {
 
 
 def eval_bc(policy, device, env,eval_name, bev_arc='unet'):
-    ckpt_dir = Path(f'ckpt/ckpt-{eval_name}')
+    ckpt_dir = Path(f'ckpts/ckpt-{eval_name}')
 
     ckpt_path = (ckpt_dir / 'ckpt_latest.pth').as_posix()
     saved_variables = th.load(ckpt_path, map_location='cuda')
 
     policy.load_state_dict(saved_variables['policy_state_dict'])
 
-    video_path = Path('video')
+    video_path = Path(f'video/{TOWN_NAME.lower()}')
     video_path.mkdir(parents=True, exist_ok=True)
 
     eval_video_path = (video_path / f'{eval_name}_{bev_arc}.mp4').as_posix()
     avg_ep_stat, avg_route_completion, ep_events = evaluate_policy(env, policy, eval_video_path, arc=bev_arc)
   
 
-    with open(f'eval_metrics/{eval_name}_{bev_arc}.json', 'w') as f:
+    with open(f'eval_metrics/{TOWN_NAME.lower()}/{eval_name}_{bev_arc}.json', 'w') as f:
         json.dump({
             'avg_ep_stat': avg_ep_stat,
             'avg_route_completion': avg_route_completion
@@ -53,19 +53,21 @@ def env_maker():
     env = EndlessEnv(obs_configs=obs_configs, reward_configs=reward_configs,
                     terminal_configs=terminal_configs, host=cfg['host'], port=cfg['port'],
                     seed=2021, no_rendering=False, **env_configs)
-    env = RlBirdviewWrapper(env,input_states=['rgb', 'traj', 'state'], acc_as_action=True)
+    env = RlBirdviewWrapper(env,input_states=['rgb', 'traj', 'state', 'matrices'], acc_as_action=True)
     return env
 
 if __name__ == '__main__':
-    env = DummyVecEnv([env_maker])
+    env = SubprocVecEnv([env_maker])
 
     observation_space = {}
-    observation_space['birdview'] = gym.spaces.Box(low=0, high=1, shape=(3, 192, 192), dtype=np.uint8)
+    observation_space['birdview'] = gym.spaces.Box(low=0, high=255, shape=(3, 192, 192), dtype=np.uint8)
     observation_space['state'] = gym.spaces.Box(low=-10.0, high=30.0, shape=(6,), dtype=np.float32)
     observation_space = gym.spaces.Dict(**observation_space)
 
     action_space = gym.spaces.Box(low=np.array([0, -1]), high=np.array([1, 1]), dtype=np.float32)
 
+    eval_name = 'real-bev'
+    bev_arc = 'cvt_6ch' 
     # network
     policy_kwargs = {
         'observation_space': observation_space,
@@ -74,6 +76,7 @@ if __name__ == '__main__':
         'features_extractor_entry_point': 'torch_layers:XtMaCNN',
         'features_extractor_kwargs': {'states_neurons': [256,256]},
         'distribution_entry_point': 'distributions:BetaDistribution',
+        'real_bev': eval_name == 'real-bev',
     }
 
     device = 'cuda'
@@ -83,4 +86,4 @@ if __name__ == '__main__':
 
     batch_size = 24
 
-    eval_bc(policy, device, env)
+    eval_bc(policy, device, env,eval_name=eval_name, bev_arc=bev_arc)

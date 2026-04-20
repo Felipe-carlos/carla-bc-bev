@@ -15,9 +15,9 @@ from bev_generation.cvt_3ch import CVT_3chL1Generator
 from dotenv import load_dotenv
 
 
-# load_dotenv()
+load_dotenv()
 
-# API_KEY = os.getenv('WANDB_API_KEY')
+API_KEY = os.getenv('WANDB_API_KEY')
 
 def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
     output_dir = Path('outputs')
@@ -165,7 +165,7 @@ if __name__ == '__main__':
     policy = AgentPolicy(**policy_kwargs)
     policy.to(device)
 
-    batch_size = 32
+    batch_size = 60
 
     gail_train_loader = th.utils.data.DataLoader(
         ExpertDataset(

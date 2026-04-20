@@ -11,6 +11,8 @@ from PIL import Image, ImageDraw
 import carla_gym.utils.transforms as trans_utils
 import carla_gym.core.task_actor.common.navigation.route_manipulation as gps_util
 import torch as th
+from expert_dataset_def.expert_dataset import get_extrinsics, get_intrinsics
+from config.obs_config import obs_configs
 
 
 def traj_plotter(traj, img_path=None):
@@ -64,9 +66,8 @@ def traj_plotter_rgb(traj, img_path=None):
         y += img_size - 40
         draw.ellipse([x - radius, y - radius, x + radius, y + radius], fill=color)
         point_idx += 1
-    image_array = np.zeros((144, 256, 1), dtype=np.uint8)
-    image_array[:, :, 0] = np.array(img)[:, :, 0]
-    image_array = np.transpose(image_array, [2, 0, 1])
+    image_array = np.array(img)              # (H, W, 3)
+    image_array = np.transpose(image_array, [2, 0, 1])  # (3, H, W)
     # image_tensor = th.as_tensor(image_array)
     return image_array
 
@@ -135,6 +136,13 @@ class RlBirdviewWrapper(gym.Wrapper):
             observation_space['command'] = gym.spaces.Box(low=-10.0, high=30.0, shape=(1,), dtype=np.float32)
         if 'state' in self._input_states:
             observation_space['state'] = gym.spaces.Box(low=-10.0, high=30.0, shape=(6,), dtype=np.float32)
+        if 'matrices' in self._input_states:
+            observation_space['extrinsics'] = gym.spaces.Box(
+                low=-np.inf, high=np.inf, shape=(4, 4), dtype=np.float32
+            )
+            observation_space['intrinsics'] = gym.spaces.Box(
+                low=-np.inf, high=np.inf, shape=(3, 3), dtype=np.float32
+            )
 
         env.observation_space = gym.spaces.Dict(**observation_space)
 
@@ -383,7 +391,13 @@ class RlBirdviewWrapper(gym.Wrapper):
             state_list.append(obs['control']['gear']/5.0)
             state_list.append(obs['velocity']['vel_xy'])
             obs_dict['state'] = np.concatenate(state_list)
-        
+        if 'matrices' in input_states:
+            extrinsics = get_extrinsics(obs_configs=obs_configs, bev_resize=obs['birdview']['masks'].shape[0])
+            intrinsics = get_intrinsics(obs_configs=obs_configs, bev_resize=obs['birdview']['masks'].shape[0])
+            obs_dict.update({
+                'extrinsics': extrinsics,
+                'intrinsics': intrinsics
+            })
 
         birdview = obs['birdview']['masks']
         obs_dict.update({

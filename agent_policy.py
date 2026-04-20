@@ -20,7 +20,8 @@ class AgentPolicy(nn.Module):
                  features_extractor_entry_point=None,
                  features_extractor_kwargs={},
                  distribution_entry_point=None,
-                 distribution_kwargs={}):
+                 distribution_kwargs={},
+                 real_bev=False):
 
         super(AgentPolicy, self).__init__()
         self.observation_space = observation_space
@@ -29,6 +30,7 @@ class AgentPolicy(nn.Module):
         self.features_extractor_kwargs = features_extractor_kwargs
         self.distribution_entry_point = distribution_entry_point
         self.distribution_kwargs = distribution_kwargs
+        self.real_bev = real_bev
         if th.cuda.is_available():
             self.device = 'cuda'
         else:
@@ -100,8 +102,10 @@ class AgentPolicy(nn.Module):
         """
         
         state = obs_dict['state']
-
-        birdview = obs_dict['birdview'].float() 
+        if self.real_bev:
+            birdview = obs_dict['birdview'].float() / 255.0
+        else:   
+            birdview = obs_dict['birdview'].float() 
         features = self.features_extractor(birdview, state)
 
         return features
@@ -113,6 +117,8 @@ class AgentPolicy(nn.Module):
             sigma = self.dist_sigma
         else:
             sigma = self.dist_sigma(latent_pi)
+       
+        
         return self.action_dist.proba_distribution(mu, sigma), mu.detach().cpu().numpy(), sigma.detach().cpu().numpy()
 
     def evaluate_actions(self, obs_dict: Dict[str, th.Tensor], actions: th.Tensor):

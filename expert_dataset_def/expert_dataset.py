@@ -174,10 +174,11 @@ class ExpertDataset(th.utils.data.Dataset):
         # Load only the first time, images in uint8 are supposed to be light
         ep_dir = self.dataset_path / 'route_{:0>2d}/ep_{:0>2d}'.format(route_idx, ep_idx)
         masks_list = []
-        # for mask_index in range(1):
-        #     mask_tensor = self.process_image(ep_dir / 'birdview_masks/{:0>4d}_{:0>2d}.png'.format(step_idx, mask_index), birdview=True)
-        #     masks_list.append(mask_tensor)
-        # birdview = th.cat(masks_list)
+        for mask_index in range(1):
+            
+            mask_tensor = self.process_image(ep_dir / 'birdview_masks/{:0>4d}_{:0>2d}.png'.format(step_idx, mask_index), birdview=True)
+            masks_list.append(mask_tensor)
+        birdview = th.cat(masks_list)
 
         central_rgb = self.process_image(ep_dir / 'central_rgb/{:0>4d}.png'.format(step_idx))
         left_rgb = self.process_image(ep_dir / 'left_rgb/{:0>4d}.png'.format(step_idx))
@@ -191,7 +192,7 @@ class ExpertDataset(th.utils.data.Dataset):
             images = th.autograd.Variable(images.type(th.cuda.FloatTensor))
             
         else:
-            traj_plot_rgb = traj_plotter_rgb(state_dict['traj'], self.bev_resize, self.bev_resize) / 255.0
+            traj_plot_rgb = traj_plotter_rgb(state_dict['traj'], self.w_resize, self.h_resize) / 255.0
 
 
             images = th.stack([left_rgb, central_rgb, right_rgb, rear_rgb,traj_plot_rgb])
@@ -204,7 +205,7 @@ class ExpertDataset(th.utils.data.Dataset):
         extrinsics = th.Tensor(np.array(extrinsics))
         intrinsics = th.Tensor(np.array(intrinsics))
         obs_dict = {
-            # 'bev': birdview,
+            'bev': birdview,
             'image': images,
             'extrinsics': extrinsics,
             'intrinsics': intrinsics,

@@ -1,0 +1,40 @@
+{
+    "avg_ep_stat": {
+        "eval/score_route": 0.13292710838715235,
+        "eval/score_penalty": 0.5561666666666667,
+        "eval/score_composed": 0.046982279607822496,
+        "eval/length": 402.3333333333333,
+        "eval/reward": 159.02839002432674,
+        "eval/timeout": 0.0,
+        "eval/is_route_completed": 0.0,
+        "eval/is_route_completed_nocrash": 0.0,
+        "eval/route_completed_in_km": 0.13292710838715235,
+        "eval/route_length_in_km": 1.3714471163502833,
+        "eval/percentage_outside_lane": 0.0,
+        "eval/percentage_wrong_lane": 0.0,
+        "eval/collisions_layout": 20.85260924618255,
+        "eval/collisions_vehicle": 0.0,
+        "eval/collisions_pedestrian": 0.0,
+        "eval/collisions_others": 0.0,
+        "eval/red_light": 17.009001895080033,
+        "eval/light_passed": 0.3333333333333333,
+        "eval/encounter_light": 1.3333333333333333,
+        "eval/stop_infraction": 0.0,
+        "eval/stop_passed": 0.0,
+        "eval/encounter_stop": 0.0,
+        "eval/route_dev": 0.0,
+        "eval/vehicle_blocked": 0.0,
+        "eval/completed_n_episodes": 3.0,
+        "eval/eval_timeout": 0,
+        "time/t_eval": 174.83757543563843,
+        "time/fps_eval": 17.158782901930405
+    },
+    "avg_route_completion": {
+        "eval/step": 750.0,
+        "eval/simulation_time": 75.00000111758709,
+        "eval/route_completed_in_m": 236.68862348794937,
+        "eval/route_length_in_m": 1382.1519252472744,
+        "eval/is_route_completed": 0.0,
+        "eval/avg_n_episodes": 4.0
+    }
+}
