@@ -1,5 +1,7 @@
 .venv
 video
+video_temporal
+
 gail_experts
 ckpt
 outputs
@@ -9,6 +11,11 @@ screenlog.0
 api_carla/
 expert-data
 ckpts
+ckpts_temporal
 Gifs_Expert_Dataset
 .env
 screenlog.*
+eval/
+runs/
+CLAUDE.md
+*.pth
