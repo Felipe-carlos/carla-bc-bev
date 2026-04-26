@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 
-
 ##############################
 #           U-NET
 ##############################
@@ -64,7 +63,7 @@ class GeneratorUNet(nn.Module):
         self.final = nn.Sequential(
             nn.ZeroPad2d((1, 0, 1, 0)),
             nn.Conv2d(128, out_channels, kernel_size=4, padding=1),
-            nn.Sigmoid(), #trocado era tahn
+            # nn.Sigmoid(), #trocado era tahn
         )
 
 
@@ -82,3 +81,7 @@ class GeneratorUNet(nn.Module):
 
         final = self.final(u4)
         return final
+#Canais de saida
+# 1 - drivible
+# 2 - rota
+# 3 - lane 

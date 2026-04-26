@@ -78,27 +78,25 @@ class CVT_3chL1Generator(IBEVGenerator):
 
     def __name__(self):
         return "cvt_3ch_L1"
-        
-    def infer(self, expert_obs_dict):
-        """
-        Inferência sem gradiente (eval mode)
 
-        Returns:
-            bev tensor (B, C, H, W)
-            expert_obs_dict precisa conter as chaves  'image', 'extrinsics','intrinsics'
-        """
+    def _to_device(self, obs_dict):
+        return {k: v.to(self.device) if isinstance(v, torch.Tensor) else v for k, v in obs_dict.items()}
+
+    def infer(self, obs_dict):
+        """No-gradient inference. Returns binarized BEV (B, 3, 192, 192) with values in {0, 255}."""
         with torch.no_grad():
-            batch = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v for k, v in expert_obs_dict.items()}
-            fake_birdview = self.generator(batch)
-            # Resize: (4, 3, 256, 256) → (4, 3, 192, 192)
-            fake_birdview = torch.nn.functional.interpolate(
-            fake_birdview,
-            size=(192, 192),
-            mode='bilinear',   # melhor para imagens
-            align_corners=False
-            )
+            batch = self._to_device(obs_dict)
+            out = self.generator(batch)
+            out = torch.nn.functional.interpolate(out, size=(192, 192), mode='bilinear', align_corners=False)
+        return (out > 0.5).byte() * 255
 
-        fake_birdview = (fake_birdview > 0.5).byte()
-        fake_birdview = fake_birdview * 255
-        return fake_birdview
+    def forward_train(self, obs_dict):
+        """Forward with gradients. Returns sigmoid output (B, 3, 192, 192) in [0, 1]."""
+        batch = self._to_device(obs_dict)
+        out = self.generator(batch)
+        return torch.nn.functional.interpolate(out, size=(192, 192), mode='bilinear', align_corners=False)
+
+    def compute_loss(self, pred, target):
+        """L1Loss: pred is sigmoid output in [0, 1], target is in [0, 1]."""
+        return torch.nn.functional.l1_loss(pred, target)
 

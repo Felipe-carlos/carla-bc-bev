@@ -1,50 +1,41 @@
 from bev_generation.IBEV_Generator import IBEVGenerator
 from .unet_def import GeneratorUNet
-import torch 
+import torch
+import torch.nn.functional as F
 import os
 
+
 class Unet_BEVGenerator(IBEVGenerator):
-    def __init__(self, model_path:str=None ,device='cuda', use_eval=True):
+    def __init__(self, model_path: str = None, device='cuda', use_eval=True):
         if model_path is None:
             main = os.getcwd()
-            model_path = os.path.join(main, 'bev_generation/unet/focal_50_generator_49.pth')
-        else:
-            model_path = model_path
-        in_channels = 13 #4 imagens rgb e 1 de trajetoria e comando
-        self.generator = GeneratorUNet(in_channels=in_channels)
-        self.generator = self.generator.to(device)
-         #-------carrega modelo------------
-        
-        checkpoint_path = model_path
-        state_dict = torch.load(checkpoint_path)
+            model_path = os.path.join(main, 'bev_generation/unet/l1_50_no sigmoid_generator_49.pth')
+        self.device = device
+        in_channels = 13
+        self.generator = GeneratorUNet(in_channels=in_channels).to(device)
 
-        # Verifique se as chaves no state_dict são compatíveis
-        # Se necessário, remova prefixos ou ajuste as chaves conforme necessário
-        new_state_dict = {}
-        for key, value in state_dict.items():
-            new_key = key.replace("generator.", "")  
-            new_state_dict[new_key] = value
-
-        # Carregar o state_dict no modelo
+        state_dict = torch.load(model_path, map_location=device)
+        new_state_dict = {k.replace("generator.", ""): v for k, v in state_dict.items()}
         self.generator.load_state_dict(new_state_dict)
 
         if use_eval:
             self.generator.eval()
-    
+
     def __name__(self):
         return "unet"
-        
-    def infer(self, expert_obs_dict):
-        """
-        Inferência sem gradiente (eval mode)
 
-        Returns:
-            bev tensor (B, C, H, W)
-        """
+    def infer(self, obs_dict):
+        """No-gradient inference. Returns binarized BEV (B, 3, H, W) with values in {0, 255}."""
         with torch.no_grad():
-            # Gerar imagem fake (com U-Net)
-            fake_birdview = self.generator(expert_obs_dict['image']) 
-            fake_birdview = (fake_birdview > 0.5).byte()  # Binarizar a saída
-            fake_birdview = fake_birdview *255 # Converter para 0 e 255
-        return fake_birdview
+            logits = self.generator(obs_dict['image'])
+            bev = (logits > 0.0).byte() * 255  # logit > 0 ↔ sigmoid > 0.5
+        return bev
+
+    def forward_train(self, obs_dict):
+        """Forward with gradients. Returns raw logits (B, 3, H, W)."""
+        return self.generator(obs_dict['image'])
+
+    def compute_loss(self, pred, target):
+        """BCEWithLogitsLoss: pred is raw logits, target is in [0, 1]."""
+        return F.binary_cross_entropy_with_logits(pred, target)
 
