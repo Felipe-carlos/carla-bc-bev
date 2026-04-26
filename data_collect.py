@@ -32,7 +32,7 @@ terminal_configs = {
 env_configs = {
     'carla_map': 'Town01',
     'weather_group': 'dynamic_1.0',
-    'routes_group': 'train'
+    'routes_group': 'ClearNoon'
 }
 def get_env_wrapper_configs(rgb=True):
     env_wrapper_configs = {
@@ -94,7 +94,7 @@ if __name__ == '__main__':
                 # control, _, _ = lateral_noiser.compute_noise(control, obs['speed']['forward_speed'][0] * 3.6)
                 ep_dict['actions'].append([control.throttle, control.steer])
                 birdview = obs['birdview']['masks']
-                for i_mask in range(0):
+                for i_mask in range(1):
                     birdview_mask = birdview[i_mask * 3: i_mask * 3 + 3]
                     birdview_mask = np.transpose(birdview_mask, [1, 2, 0]).astype(np.uint8)
                     Image.fromarray(birdview_mask).save(episode_dir / 'birdview_masks' / '{:0>4d}_{:0>2d}.png'.format(i_step, i_mask))

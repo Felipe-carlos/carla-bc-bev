@@ -40,18 +40,21 @@ def traj_plotter(traj, img_path=None):
     image_array = np.zeros((img_size, img_size, 1), dtype=np.uint8)
     image_array[:, :, 0] = np.array(img)[:, :, 0]
     image_array = np.transpose(image_array, [2, 0, 1])
-    # image_tensor = th.as_tensor(image_array)
-    return image_array
+    image_tensor = th.as_tensor(image_array)
+    return image_tensor
 
 
 def traj_plotter_rgb(traj, img_path=None):
-    img_size = 192
+    # Canvas dimensions
+    H, W = 144, 256  # ← Usar dimensões REAIS do canvas!
     radius = 10
     color = (255, 255, 255)
     scale = 500
     point_idx = -1
-    img = Image.fromarray(np.zeros((144, 256, 3), dtype=np.uint8))
+    
+    img = Image.fromarray(np.zeros((H, W, 3), dtype=np.uint8))
     draw = ImageDraw.Draw(img)
+    
     while (point_idx + 1) * 2 <= len(traj):
         if point_idx < 0:
             x = traj[1] * scale
@@ -62,13 +65,16 @@ def traj_plotter_rgb(traj, img_path=None):
         else:
             x = traj[point_idx*2 + 1] * scale
             y = -1 * traj[point_idx*2] * scale
-        x += img_size / 2
-        y += img_size - 40
+        
+        # ← CORREÇÃO: usar W e H reais para posicionamento
+        x += W / 2           # 256/2 = 128 ✓
+        y += H - 40          # 144-40 = 104 ✓
+        
         draw.ellipse([x - radius, y - radius, x + radius, y + radius], fill=color)
         point_idx += 1
-    image_array = np.array(img)              # (H, W, 3)
-    image_array = np.transpose(image_array, [2, 0, 1])  # (3, H, W)
-    # image_tensor = th.as_tensor(image_array)
+    
+    image_array = np.array(img)
+    image_array = np.transpose(image_array, [2, 0, 1])  # HWC → CHW
     return image_array
 
 
@@ -392,8 +398,18 @@ class RlBirdviewWrapper(gym.Wrapper):
             state_list.append(obs['velocity']['vel_xy'])
             obs_dict['state'] = np.concatenate(state_list)
         if 'matrices' in input_states:
-            extrinsics = get_extrinsics(obs_configs=obs_configs, bev_resize=obs['birdview']['masks'].shape[0])
-            intrinsics = get_intrinsics(obs_configs=obs_configs, bev_resize=obs['birdview']['masks'].shape[0])
+            rgb_h = obs['central_rgb']['data'].shape[0]
+            rgb_w = obs['central_rgb']['data'].shape[1]
+            
+            if rgb_w == 480 and rgb_h == 224:
+                bev_resize = 256  # cvt_6ch
+            elif rgb_w == 256 and rgb_h == 256:
+                bev_resize = 256  # cvt
+            else:
+                bev_resize = 192  # default/unet
+            
+            extrinsics = get_extrinsics(obs_configs=obs_configs, bev_resize=bev_resize)
+            intrinsics = get_intrinsics(obs_configs=obs_configs, bev_resize=bev_resize)
             obs_dict.update({
                 'extrinsics': extrinsics,
                 'intrinsics': intrinsics

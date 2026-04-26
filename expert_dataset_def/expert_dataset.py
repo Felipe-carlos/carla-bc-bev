@@ -18,8 +18,8 @@ import os
 
 warnings.filterwarnings("ignore")
 
-def traj_plotter(traj,  w_resize , h_resize , img_path=None):
-    img_size = w_resize
+def traj_plotter(traj, img_path=None):
+    img_size = 192
     radius = 10
     color = (255, 255, 255)
     scale = 500
@@ -186,7 +186,7 @@ class ExpertDataset(th.utils.data.Dataset):
         rear_rgb = self.process_image(ep_dir / 'rear_rgb/{:0>4d}.png'.format(step_idx)) ###
         state_dict = self.trajs_states[j]
         if self.unet:
-            traj_plot = traj_plotter(state_dict['traj'], self.w_resize, self.h_resize) / 255.0
+            traj_plot = traj_plotter(state_dict['traj']) / 255.0
             cameras = [central_rgb, left_rgb, right_rgb, rear_rgb,traj_plot]
             images = th.cat(cameras,dim=0)
             images = th.autograd.Variable(images.type(th.cuda.FloatTensor))

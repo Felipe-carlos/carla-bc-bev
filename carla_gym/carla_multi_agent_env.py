@@ -35,7 +35,7 @@ class CarlaMultiAgentEnv(gym.Env):
         # self._zw_handler = ZombieWalkerHandler(self._client)
         # self._zv_handler = ZombieVehicleHandler(self._client, tm_port=self._tm.get_port())
         self._sa_handler = ScenarioActorHandler(self._client)
-        # self._wt_handler = WeatherHandler(self._world)
+        #self._wt_handler = WeatherHandler(self._world)
 
         # observation spaces
         self.observation_space = self._om_handler.observation_space
