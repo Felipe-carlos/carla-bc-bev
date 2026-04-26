@@ -12,6 +12,7 @@ import os
 from expert_dataset_def.expert_dataset import ExpertDataset
 from agent_policy import AgentPolicy
 from bev_generation.cvt_3ch import CVT_3chL1Generator
+from bev_generation.bev_buffer import TemporalBEVBuffer
 from dotenv import load_dotenv
 
 
@@ -19,16 +20,22 @@ load_dotenv()
 
 API_KEY = os.getenv('WANDB_API_KEY')
 
-def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
-    output_dir = Path('outputs')
+def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train, temporal_buffer=False):
+    outputs_folder = 'outputs_temporal' if temporal_buffer else 'outputs'
+    output_dir = Path(outputs_folder)
     output_dir.mkdir(parents=True, exist_ok=True)
     last_checkpoint_path = output_dir / 'checkpoint.txt'
 
     bev_generator = CVT_3chL1Generator(device=device)
-    project_name = f'bev_bc-{bev_generator.__name__()}'
+    project_name = f'bev_bc-{"temporal-" if temporal_buffer else ""}{bev_generator.__name__()}'
 
-    ckpt_dir = Path(f'ckpts/ckpt-{bev_generator.__name__()}')
+    ckpt_folder = 'ckpts_temporal' if temporal_buffer else 'ckpts'
+    ckpt_dir = Path(f'{ckpt_folder}/ckpt-{bev_generator.__name__()}')
     ckpt_dir.mkdir(parents=True, exist_ok=True)
+
+    if temporal_buffer:
+        temporal_buffer_train = TemporalBEVBuffer(device)
+        temporal_buffer_eval = TemporalBEVBuffer(device)
 
     if resume_last_train:
         with open(last_checkpoint_path, 'r') as f:
@@ -62,20 +69,26 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
     eval_step = int(1e5)
     steps_last_eval = 0
 
-    
-    for i_episode in tqdm.tqdm(range(start_ep, episodes),'Episode:'):
+    for i_episode in tqdm.tqdm(range(start_ep, episodes), desc='Episode:'):
+        if temporal_buffer:
+            temporal_buffer_train.reset()
+            temporal_buffer_eval.reset()
+
         total_loss = 0
         i_batch = 0
         policy = policy.train()
-        # Expert dataset
-        for expert_batch in tqdm.tqdm(expert_loader,'Batches:'):
+
+        # Expert dataset (TREINO)
+        for expert_batch in tqdm.tqdm(expert_loader, desc='Batches:', leave=False):
             expert_obs_dict, expert_action = expert_batch
-           
-            bev = bev_generator.infer(expert_obs_dict)
+
+            bev = bev_generator.infer(expert_obs_dict).to(device)
+            if temporal_buffer:
+                bev = temporal_buffer_train.get_concat(bev)
                         
             obs_tensor_dict = {
                 'state': expert_obs_dict['state'].float().to(device),
-                'birdview': bev.to(device)
+                'birdview': bev
             }
             expert_action = expert_action.to(device)
 
@@ -92,15 +105,19 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
             loss.backward()
             optimizer.step()
 
+        # VALIDAÇÃO
         total_eval_loss = 0
         i_eval_batch = 0
         for expert_batch in eval_loader:
             expert_obs_dict, expert_action = expert_batch
-            bev = bev_generator.infer(expert_obs_dict)
+
+            bev = bev_generator.infer(expert_obs_dict).to(device)
+            if temporal_buffer:
+                bev = temporal_buffer_eval.get_concat(bev)
             
             obs_tensor_dict = {
                 'state': expert_obs_dict['state'].float().to(device),
-                'birdview': bev.to(device)
+                'birdview': bev
             }
             expert_action = expert_action.to(device)
 
@@ -142,9 +159,11 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
 
 if __name__ == '__main__':
     resume_last_train = False
+    temporal_buffer = False
 
+    bev_channels = 9 if temporal_buffer else 3  # [t-2, t-1, t] vs single frame
     observation_space = {}
-    observation_space['birdview'] = gym.spaces.Box(low=0, high=255, shape=(3, 192, 192), dtype=np.uint8)
+    observation_space['birdview'] = gym.spaces.Box(low=0, high=255, shape=(bev_channels, 192, 192), dtype=np.uint8)
     observation_space['state'] = gym.spaces.Box(low=-10.0, high=30.0, shape=(6,), dtype=np.float32)
     observation_space = gym.spaces.Dict(**observation_space)
 
@@ -167,6 +186,7 @@ if __name__ == '__main__':
 
     batch_size = 60
 
+    # NOTA: Para aprendizado temporal consistente, considere shuffle=False ou um dataset que retorne sequências.
     gail_train_loader = th.utils.data.DataLoader(
         ExpertDataset(
             'expert-data',
@@ -175,7 +195,7 @@ if __name__ == '__main__':
             unet=False
         ),
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=True, # Recomenda-se shuffle=False se os dados forem ordenados temporalmente
     )
     
     gail_val_loader = th.utils.data.DataLoader(
@@ -184,10 +204,9 @@ if __name__ == '__main__':
             routes=[0,1],
             n_eps=1,
             unet=False
-            
         ),
         batch_size=batch_size,
         shuffle=True,
     )
 
-    learn_bc(policy, device, gail_train_loader, gail_val_loader, resume_last_train)
+    learn_bc(policy, device, gail_train_loader, gail_val_loader, resume_last_train, temporal_buffer)
