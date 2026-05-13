@@ -1,9 +1,9 @@
 from typing import Literal
-def get_obs_configs(arc:Literal['unet', 'cvt','cvt_6ch']):
-    
-    if arc == 'cvt':
+def get_obs_configs(arc:Literal['unet', 'cvt', 'cvt_finetuned', 'cvt_6ch', 'cvt_6ch_kde']):
+
+    if arc in ('cvt', 'cvt_finetuned'):
         sizes = (256, 144, 256)
-    elif arc == 'cvt_6ch':
+    elif arc in ('cvt_6ch', 'cvt_6ch_kde'):
         sizes = (480, 224, 200)
     else:
         sizes = (192, 192, 192)

@@ -63,7 +63,7 @@ class GeneratorUNet(nn.Module):
         self.final = nn.Sequential(
             nn.ZeroPad2d((1, 0, 1, 0)),
             nn.Conv2d(128, out_channels, kernel_size=4, padding=1),
-            # nn.Sigmoid(), #trocado era tahn
+            #nn.Sigmoid(), #trocado era tahn
         )
 
 

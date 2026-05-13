@@ -56,6 +56,10 @@ class CarlaMultiAgentEnv(gym.Env):
         self._shuffle_task = False
         self._task = self._all_tasks[self._task_idx].copy()
 
+    def reset_rng(self, seed=2021):
+        set_random_seed(seed, using_cuda=True)
+        self._tm.set_random_device_seed(seed)
+
     @property
     def num_tasks(self):
         return len(self._all_tasks)

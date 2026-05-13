@@ -17,5 +17,7 @@ Gifs_Expert_Dataset
 screenlog.*
 eval/
 runs/
+0.csv
 CLAUDE.md
 *.pth
+*.mp4

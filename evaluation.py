@@ -19,8 +19,8 @@ from config.obs_config import get_obs_configs
 
 TOWN_NAME = 'Town01'
 SAVE_BEV_VIDEO = True
-eval_name = 'cvt_3ch_L1'
-bev_arc = 'cvt'         ###['unet', 'cvt', 'expert','cvt_6ch']
+eval_name = 'real-bev'          
+bev_arc = 'unet'         ###['unet', 'cvt', 'cvt_finetuned', 'expert', 'cvt_6ch']
 temporal_buffer = False
 
 env_configs = {
@@ -34,7 +34,7 @@ def eval_bc(policy, device, env,eval_name, bev_arc='unet'):
     ckpt_folder = 'ckpts_temporal' if temporal_buffer else 'ckpts'
     ckpt_dir = Path(f'{ckpt_folder}/ckpt-{eval_name}')
 
-    ckpt_path = (ckpt_dir / 'bc_ckpt_63_min_eval.pth').as_posix() ### era ckpt_latest.pth
+    ckpt_path = (ckpt_dir / 'ckpt_latest.pth').as_posix() ### era ckpt_latest.pth
     saved_variables = th.load(ckpt_path, map_location='cuda')
 
     policy.load_state_dict(saved_variables['policy_state_dict'])
@@ -44,9 +44,8 @@ def eval_bc(policy, device, env,eval_name, bev_arc='unet'):
     video_path.mkdir(parents=True, exist_ok=True)
 
     bev_video_path = None
-    if SAVE_BEV_VIDEO:
-        eval_folder = 'eval_temporal' if temporal_buffer else 'eval'
-        bev_video_path = Path(f'{eval_folder}/{bev_arc}/{TOWN_NAME.lower()}')    
+    if SAVE_BEV_VIDEO and not temporal_buffer:
+        bev_video_path = Path(f'bev_video/{TOWN_NAME.lower()}/{eval_name}_{bev_arc}.mp4')    
 
     eval_video_path = (video_path / f'{eval_name}_{bev_arc}.mp4').as_posix()
     avg_ep_stat, avg_route_completion, ep_events = evaluate_policy(

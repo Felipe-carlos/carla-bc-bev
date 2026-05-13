@@ -1,11 +1,14 @@
+import csv
 import numpy as np
 import time
 from gym.wrappers.monitoring.video_recorder import ImageEncoder
 from bev_generation.unet import Unet_BEVGenerator
-from bev_generation.cvt_3ch import CVT_3chL1Generator 
+from bev_generation.cvt_3ch import CVT_3chL1Generator
+from bev_generation.cvt_3ch_finetuned import CVT_3chL1FinetunedGenerator
 from bev_generation.cvt_6ch import CVT_6chVanilla
+from bev_generation.cvt_6ch_kde import CVT_6chKDE
 from pathlib import Path
-import cv2 
+import cv2
 import torch as th
 from typing import Literal, Optional
 from bev_generation.bev_buffer import TemporalBEVBuffer
@@ -196,16 +199,18 @@ def evaluate_policy(
         policy,
         video_path,
         min_eval_steps=3000,
-        arc:Literal['unet', 'cvt', 'expert','cvt_6ch']='unet',
-        video_save_dir: Optional[str] = None, 
-        temporal_buffer=False
+        arc:Literal['unet', 'cvt', 'cvt_finetuned', 'expert', 'cvt_6ch', 'cvt_6ch_kde']='unet',
+        video_save_dir: Optional[str] = None,
+        temporal_buffer=False,
+        save_iou_csv: bool = False,
+        iou_csv_path: Optional[str] = None,
     ):
 
     device = 'cuda'
-    video_dir = Path(video_save_dir) if video_save_dir is not None else None
-    if video_dir is not None:
-        video_dir.mkdir(parents=True, exist_ok=True)
-        print(f"🎥 Evaluation video directory set: {video_dir}")
+    bev_video_out = Path(video_save_dir) if video_save_dir is not None else None
+    if bev_video_out is not None:
+        bev_video_out.parent.mkdir(parents=True, exist_ok=True)
+        print(f"🎥 BEV video will be saved to: {bev_video_out}")
 
     # Inicialização do Gerador de BEV
     bev_generator = None
@@ -216,8 +221,12 @@ def evaluate_policy(
             bev_generator = Unet_BEVGenerator(device=device)
         elif arc == 'cvt':
             bev_generator = CVT_3chL1Generator(device=device)
+        elif arc == 'cvt_finetuned':
+            bev_generator = CVT_3chL1FinetunedGenerator(device=device)
         elif arc == 'cvt_6ch':
             bev_generator = CVT_6chVanilla(device=device)
+        elif arc == 'cvt_6ch_kde':
+            bev_generator = CVT_6chKDE(device=device)
 
     # ==========================================
     # INICIALIZAÇÃO DO BUFFER TEMPORAL
@@ -228,9 +237,8 @@ def evaluate_policy(
         # Se usar UNET ou outras resoluções, ajuste aqui conforme necessário.
        
         temporal_bev_buffer = TemporalBEVBuffer(
-            device=device, 
-            num_envs=env.num_envs, 
-            channels=3
+            device=device,
+            channels=3,
         )
         print(f"⏱️  Temporal buffer enabled: [t-2, t-1, t] concatenation")
 
@@ -256,6 +264,9 @@ def evaluate_policy(
     for i in range(env.num_envs):
         ep_events[f'venv_{i}'] = []
 
+    _do_iou = save_iou_csv and iou_csv_path is not None and arc != 'expert'
+    iou_rows: list = []
+
     n_step = 0
     n_timeout = 0
     env_done = np.array([False]*env.num_envs)
@@ -271,7 +282,7 @@ def evaluate_policy(
                 image_input = {'image': create_image_tensor(obs,unet=unet).to(device)}
                 bev = bev_generator.infer(image_input)
                 
-            elif arc == 'cvt':
+            elif arc in ('cvt', 'cvt_finetuned'):
                 unet = False
                 image_input = {
                     'image': create_image_tensor(obs,unet=unet,w_resize=256,h_resize=256).to(device),
@@ -279,8 +290,8 @@ def evaluate_policy(
                     'intrinsics': th.as_tensor(obs['intrinsics'], dtype=th.float32).to(device),
                 }
                 bev = bev_generator.infer(image_input)
-                
-            elif arc == 'cvt_6ch':
+
+            elif arc in ('cvt_6ch', 'cvt_6ch_kde'):
                 unet = False
                 image_input = {
                     'image': create_image_tensor(obs,unet=unet,w_resize=480,h_resize=224).to(device),
@@ -289,6 +300,19 @@ def evaluate_policy(
                 }
                 bev = bev_generator.infer(image_input)
             
+            # ==========================================
+            # IoU POR PASSO (pred 3ch vs GT 3ch, ambos 192×192 {0,255})
+            # ==========================================
+            if _do_iou:
+                pred_bin   = (th.as_tensor(bev,                          dtype=th.float32) > 127).float().cpu()
+                target_bin = (th.as_tensor(real_bev[:, :3, :, :],        dtype=th.float32) > 127).float().cpu()
+                intersection = (pred_bin * target_bin).sum(dim=(2, 3))
+                union        = pred_bin.sum(dim=(2, 3)) + target_bin.sum(dim=(2, 3)) - intersection
+                iou_per_env  = (intersection / (union + 1e-7))           # (B, 3)
+                for b in range(iou_per_env.shape[0]):
+                    ious = iou_per_env[b].tolist()
+                    iou_rows.append([n_step * env.num_envs + b] + ious + [sum(ious) / len(ious)])
+
             # ==========================================
             # APLICAÇÃO DO BUFFER TEMPORAL
             # ==========================================
@@ -300,24 +324,19 @@ def evaluate_policy(
             obs['birdview'] = bev
                 
             # Grava frames para o vídeo BEV+RGB se o diretório foi especificado
-            if video_dir is not None:
-                # Para visualização, passamos a bev gerada (se for temporal, a função de prepare_image
-                # pode precisar de ajuste para visualizar apenas os 3 canais centrais, mas o compose_frame
-                # atual lida com tensors genéricos).
-                frame = compose_frame(obs, bev, real_bev)  
+            if bev_video_out is not None:
+                frame = compose_frame(obs, bev, real_bev)
 
                 if bev_video_encoder is None:
-                    bev_video_path = video_dir / "evaluation_bev_rgb.mp4"
                     bev_video_encoder = ImageEncoder(
-                        output_path=str(bev_video_path),
+                        output_path=str(bev_video_out),
                         frame_shape=frame.shape,
                         frames_per_sec=30,
                         output_frames_per_sec=30
                     )
-                    print(f"📹 Recording BEV+RGB: {bev_video_path} | Shape: {frame.shape} | @ 30fps")
+                    print(f"📹 Recording BEV+RGB: {bev_video_out} | Shape: {frame.shape} | @ 30fps")
 
-                if bev_video_encoder is not None:
-                    bev_video_encoder.capture_frame(frame)
+                bev_video_encoder.capture_frame(frame)
 
         # Forward da política (a policy deve esperar 9 canais se temporal_buffer=True)
         actions, log_probs, mu, sigma, _ = policy.forward(obs, deterministic=True, clip_action=True)
@@ -338,10 +357,8 @@ def evaluate_policy(
         # ==========================================
         # RESET PARCIAL DO BUFFER (PARA EPISÓDIOS QUE TERMINARAM)
         # ==========================================
-        if temporal_bev_buffer is not None:
-            done_indices = np.where(done)[0]
-            if len(done_indices) > 0:
-                temporal_bev_buffer.reset(env_indices=done_indices)
+        if temporal_bev_buffer is not None and np.any(done):
+            temporal_bev_buffer.reset()
 
         for i in np.where(done)[0]:
             if not info[i]['timeout']:
@@ -363,7 +380,16 @@ def evaluate_policy(
     # === Finaliza o encoder do vídeo BEV+RGB ===
     if bev_video_encoder is not None:
         bev_video_encoder.close()
-        print(f"✅ BEV/RGB video saved successfully: {bev_video_path}")
+        print(f"✅ BEV/RGB video saved successfully: {bev_video_out}")
+
+    # === Salva CSV de IoU por passo ===
+    if _do_iou and iou_rows:
+        Path(iou_csv_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(iou_csv_path, 'w', newline='') as f:
+            w = csv.writer(f)
+            w.writerow(['sample_idx', 'iou_ch0', 'iou_ch1', 'iou_ch2', 'mean_iou'])
+            w.writerows(iou_rows)
+        print(f"✅ IoU CSV saved: {iou_csv_path} ({len(iou_rows)} steps)")
 
     avg_ep_stat = get_avg_ep_stat(ep_stat_buffer, prefix='eval/')
     avg_route_completion = get_avg_route_completion(route_completion_buffer, prefix='eval/')

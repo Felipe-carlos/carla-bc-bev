@@ -1,0 +1,36 @@
+{
+    "completed": [
+        "Town01__real-bev__unet__standard",
+        "Town01__unet__unet__standard",
+        "Town01__real-bev__cvt__standard",
+        "Town01__cvt_3ch_L1__cvt__standard",
+        "Town01__real-bev__cvt_finetuned__standard",
+        "Town01__real-bev__expert__standard",
+        "Town01__real-bev__cvt_6ch__standard",
+        "Town01__cvt_6ch_vanilla__cvt_6ch__standard",
+        "Town01__real-bev__cvt_6ch_kde__standard",
+        "Town02__real-bev__unet__standard",
+        "Town02__unet__unet__standard",
+        "Town02__real-bev__cvt__standard",
+        "Town02__cvt_3ch_L1__cvt__standard",
+        "Town02__real-bev__cvt_finetuned__standard",
+        "Town02__real-bev__expert__standard",
+        "Town02__real-bev__cvt_6ch__standard",
+        "Town02__cvt_6ch_vanilla__cvt_6ch__standard",
+        "Town02__real-bev__cvt_6ch_kde__standard",
+        "Town01__cvt_3ch_L1__cvt__temporal",
+        "Town01__cvt_3ch_L1__cvt_finetuned__temporal",
+        "Town01__cvt_3ch_L1__cvt_6ch__temporal",
+        "Town01__cvt_3ch_L1__cvt_6ch_kde__temporal",
+        "Town02__cvt_3ch_L1__cvt__temporal",
+        "Town02__cvt_3ch_L1__cvt_finetuned__temporal",
+        "Town02__cvt_3ch_L1__cvt_6ch__temporal",
+        "Town02__cvt_3ch_L1__cvt_6ch_kde__temporal"
+    ],
+    "failed": [
+        {
+            "key": "Town01__cvt_3ch_L1__cvt_6ch__temporal",
+            "error": "Traceback (most recent call last):\n  File \"/home/felipe_cds/carla-bc-bev/run_all_evals.py\", line 211, in run_block\n    run_single_eval(\n  File \"/home/felipe_cds/carla-bc-bev/run_all_evals.py\", line 155, in run_single_eval\n    avg_ep_stat, avg_route_completion, ep_events = evaluate_policy(\n  File \"/home/felipe_cds/carla-bc-bev/eval_agent.py\", line 343, in evaluate_policy\n    obs, reward, done, info = env.step(actions)\n  File \"/home/felipe_cds/carla-bc-bev/.venv/lib/python3.8/site-packages/stable_baselines3/common/vec_env/base_vec_env.py\", line 162, in step\n    return self.step_wait()\n  File \"/home/felipe_cds/carla-bc-bev/.venv/lib/python3.8/site-packages/stable_baselines3/common/vec_env/subproc_vec_env.py\", line 120, in step_wait\n    results = [remote.recv() for remote in self.remotes]\n  File \"/home/felipe_cds/carla-bc-bev/.venv/lib/python3.8/site-packages/stable_baselines3/common/vec_env/subproc_vec_env.py\", line 120, in <listcomp>\n    results = [remote.recv() for remote in self.remotes]\n  File \"/home/felipe_cds/.pyenv/versions/3.8.19/lib/python3.8/multiprocessing/connection.py\", line 250, in recv\n    buf = self._recv_bytes()\n  File \"/home/felipe_cds/.pyenv/versions/3.8.19/lib/python3.8/multiprocessing/connection.py\", line 414, in _recv_bytes\n    buf = self._recv(4)\n  File \"/home/felipe_cds/.pyenv/versions/3.8.19/lib/python3.8/multiprocessing/connection.py\", line 383, in _recv\n    raise EOFError\nEOFError\n"
+        }
+    ]
+}

@@ -1,8 +1,5 @@
 # modified from https://github.com/zhejz/carla-roach/blob/main/carla_gym/core/task_actor/ego_vehicle/ego_vehicle_handler.py
 
-import os
-import time
-
 from carla_gym.core.task_actor.common.task_vehicle import TaskVehicle
 import numpy as np
 from importlib import import_module
@@ -28,7 +25,9 @@ class EgoVehicleHandler(object):
         self._world = client.get_world()
         self._map = self._world.get_map()
         self._spawn_transforms = self._get_spawn_points(self._map)
-        np.random.seed((os.getpid() * int(time.time())) % 124579)
+        # Comentado: re-seed não-determinístico baseado em time.time() que sobrescreve
+        # a seed global fixada em _init_client, causando spawn points diferentes a cada execução.
+        # np.random.seed((os.getpid() * int(time.time())) % 124579)
 
     def reset(self, task_config):
         actor_config = task_config['actors']

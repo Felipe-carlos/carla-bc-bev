@@ -5,7 +5,7 @@ import torch as th
 from sklearn.neighbors import KernelDensity
 
 
-def load_kde(dataset_dir: str, routes, n_eps: int = 1, bandwidth: float = 0.2) -> KernelDensity:
+def load_kde(dataset_dir: str, routes, n_eps: int = 1, bandwidth: float = 0.05) -> KernelDensity:
     """
     Fits a KernelDensity on all expert actions loaded from episode.json files.
     Call once at training startup and reuse the returned object — do not refit in the loop.
@@ -26,7 +26,7 @@ def load_kde(dataset_dir: str, routes, n_eps: int = 1, bandwidth: float = 0.2) -
         raise ValueError(f"No expert actions found in '{dataset_dir}'. Check dataset_dir and routes.")
 
     actions_np = np.array(all_actions, dtype=np.float64)
-    kde = KernelDensity(kernel='gaussian', bandwidth=bandwidth)
+    kde = KernelDensity(kernel='gaussian', bandwidth=bandwidth)  # bandwidth reduzido para 0.05 — espaço de ação 2D estreito
     kde.fit(actions_np)
     print(f"[KDE] Fitted on {len(all_actions)} expert actions from '{dataset_dir}'.")
     return kde

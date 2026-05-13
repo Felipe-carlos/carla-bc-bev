@@ -11,7 +11,7 @@ import os
 
 from expert_dataset_def.expert_dataset import ExpertDataset
 from agent_policy import AgentPolicy
-from bev_generation.cvt_3ch import CVT_3chL1Generator
+from bev_generation.cvt_6ch import CVT_6chVanilla
 from bev_generation.bev_buffer import TemporalBEVBuffer
 from dotenv import load_dotenv
 
@@ -26,8 +26,9 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train, temp
     output_dir.mkdir(parents=True, exist_ok=True)
     last_checkpoint_path = output_dir / 'checkpoint.txt'
 
-    bev_generator = CVT_3chL1Generator(device=device)
+    bev_generator = CVT_6chVanilla(device=device)
     project_name = f'bev_bc-{"temporal-" if temporal_buffer else ""}{bev_generator.__name__()}'
+    print(f"Starting BC training with project name: {project_name}")
 
     ckpt_folder = 'ckpts_temporal' if temporal_buffer else 'ckpts'
     ckpt_dir = Path(f'{ckpt_folder}/ckpt-{bev_generator.__name__()}')
@@ -184,7 +185,7 @@ if __name__ == '__main__':
     policy = AgentPolicy(**policy_kwargs)
     policy.to(device)
 
-    batch_size = 60
+    batch_size = 32
 
     # NOTA: Para aprendizado temporal consistente, considere shuffle=False ou um dataset que retorne sequências.
     gail_train_loader = th.utils.data.DataLoader(
@@ -192,7 +193,8 @@ if __name__ == '__main__':
             'expert-data',
             routes=range(2, 10),
             n_eps=1,
-            unet=False
+            unet=False,
+            sizes=(480,224,192)
         ),
         batch_size=batch_size,
         shuffle=True, # Recomenda-se shuffle=False se os dados forem ordenados temporalmente
@@ -203,7 +205,8 @@ if __name__ == '__main__':
             'expert-data',
             routes=[0,1],
             n_eps=1,
-            unet=False
+            unet=False,
+            sizes=(480,224,192)
         ),
         batch_size=batch_size,
         shuffle=True,

@@ -46,7 +46,7 @@ def traj_plotter(traj, img_path=None):
 
 def traj_plotter_rgb(traj, img_path=None):
     # Canvas dimensions
-    H, W = 144, 256  # ← Usar dimensões REAIS do canvas!
+    H, W = 224, 480  # ← Usar dimensões REAIS do canvas!
     radius = 10
     color = (255, 255, 255)
     scale = 500
