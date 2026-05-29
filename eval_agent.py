@@ -7,12 +7,70 @@ from bev_generation.cvt_3ch import CVT_3chL1Generator
 from bev_generation.cvt_3ch_finetuned import CVT_3chL1FinetunedGenerator
 from bev_generation.cvt_6ch import CVT_6chVanilla
 from bev_generation.cvt_6ch_kde import CVT_6chKDE
+from bev_generation.cvt_6ch_traj import CVT_6chTraj
+from bev_generation.cvt_6ch_traj_cmd import CVT_6chTrajCmd
+from bev_generation.cvt_6ch_traj_cmd_kde import CVT_6chTrajCmdKDE
 from pathlib import Path
 import cv2
 import torch as th
 from typing import Literal, Optional
 from bev_generation.bev_buffer import TemporalBEVBuffer
 
+
+
+def classify_maneuver(command, traj_raw, curve_thresh_deg=15.0, max_range_m=50.0):
+    """
+    Classifica a manobra do frame a partir do RoadOption e dos waypoints do traj.
+
+    command  : int — valor salvo pelo wrapper (-1=VOID, 1=LEFT, 2=RIGHT, 3=STRAIGHT, 4=LANEFOLLOW)
+    traj_raw : array (10,) em metros/100 → internamente converte para (5,2) metros
+
+    cruzamento só vem de cmd=1/2 (sinal explícito do CARLA). Para cmd=3/4, a geometria
+    distingue apenas reta vs curva — ângulos de curvas de pista e de cruzamentos são
+    muito parecidos, tornando a distinção geométrica não confiável.
+
+    Retorna: (maneuver: str, direction: str)
+      maneuver  : 'reta' | 'curva' | 'cruzamento' | 'void'
+      direction : 'none' | 'esquerda' | 'direita'
+    """
+    cmd = int(command[0]) if hasattr(command, '__len__') else int(command)
+
+    if cmd in (0, -1):
+        return ('void', 'none')
+    if cmd == 1:
+        return ('cruzamento', 'esquerda')
+    if cmd == 2:
+        return ('cruzamento', 'direita')
+
+    # cmd == 3 (STRAIGHT) ou 4 (LANEFOLLOW) — usa geometria do traj apenas para reta vs curva.
+    wp = np.asarray(traj_raw, dtype=float).reshape(5, 2) * 100.0  # (5,2) metros
+    mask = (wp[:, 0] > 0) & (np.abs(wp[:, 0]) <= max_range_m) & (np.abs(wp[:, 1]) <= max_range_m)
+    in_bev = wp[mask]
+
+    if len(in_bev) < 2:
+        return ('reta', 'none')
+
+    far = in_bev[-1]
+    ang = float(np.degrees(np.arctan2(far[1], far[0])))
+
+    if abs(ang) < curve_thresh_deg:
+        return ('reta', 'none')
+    else:
+        return ('curva', 'direita' if ang > 0 else 'esquerda')
+
+
+def create_image_tensor_4cam(obs, w_resize=480, h_resize=224):
+    """4 RGB cameras only — no trajectory image. Returns (1, 4, 3, H, W)."""
+    def process_image(image: np.ndarray):
+        if image.ndim == 4:
+            image = image[0]
+        image = image.transpose(1, 2, 0)
+        image = cv2.resize(image, (w_resize, h_resize))
+        image = image.transpose(2, 0, 1)
+        return th.as_tensor(image, dtype=th.float32) / 255.0
+
+    cameras = [process_image(obs[k]) for k in ["left_rgb", "central_rgb", "right_rgb", "rear_rgb"]]
+    return th.stack(cameras, dim=0).unsqueeze(0)  # (1, 4, 3, H, W)
 
 
 def create_image_tensor(obs, unet=False, w_resize=192, h_resize=192):
@@ -105,11 +163,12 @@ def prepare_image(img, max_h=None, max_w=None):
     return img
 
 
-def compose_frame(obs, bev_gen, real_bev, fixed_size=150):
+def compose_frame(obs, bev_gen, real_bev, fixed_size=150, iou=None, maneuver=None, direction=None):
     """
     Monta frame com todas as imagens em tamanho fixo (padrão 150x150):
     - Topo: 4 câmeras RGB (150x150 cada) + labels
     - Base: Real BEV (150x150) | Generated BEV (150x150) | Route (150x150) + labels
+    - Faixa inferior: IoU por canal + classificação do trecho (se fornecidos)
     Retorna: np.ndarray (H, W, 3), uint8, RGB
     """
     
@@ -189,17 +248,32 @@ def compose_frame(obs, bev_gen, real_bev, fixed_size=150):
         final_frame = final_frame[:, :, :3]
     if final_frame.dtype != np.uint8:
         final_frame = final_frame.astype(np.uint8)
-        
+
+    # Faixa de info: IoU por canal + classificação do trecho
+    if iou is not None or maneuver is not None:
+        strip_h = 32
+        strip = np.full((strip_h, final_frame.shape[1], 3), 25, dtype=np.uint8)
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        parts = []
+        if iou is not None:
+            mean_v = sum(iou) / len(iou)
+            parts.append(f"IoU  ch0={iou[0]:.2f}  ch1={iou[1]:.2f}  ch2={iou[2]:.2f}  mean={mean_v:.2f}")
+        if maneuver is not None:
+            dir_str = f" {direction}" if direction and direction != 'none' else ""
+            parts.append(f"{maneuver}{dir_str}")
+        cv2.putText(strip, "   |   ".join(parts), (10, 22), font, 0.45, (255, 220, 50), 1, cv2.LINE_AA)
+        final_frame = np.vstack([final_frame, strip])
+
     return final_frame  # RGB, uint8, (H, W, 3)
 
    
 
 def evaluate_policy(
-        env, 
+        env,
         policy,
         video_path,
         min_eval_steps=3000,
-        arc:Literal['unet', 'cvt', 'cvt_finetuned', 'expert', 'cvt_6ch', 'cvt_6ch_kde']='unet',
+        arc:Literal['unet', 'cvt', 'cvt_finetuned', 'expert', 'cvt_6ch', 'cvt_6ch_kde', 'cvt_6ch_traj', 'cvt_6ch_traj_cmd', 'cvt_6ch_traj_cmd_kde']='unet',
         video_save_dir: Optional[str] = None,
         temporal_buffer=False,
         save_iou_csv: bool = False,
@@ -227,6 +301,12 @@ def evaluate_policy(
             bev_generator = CVT_6chVanilla(device=device)
         elif arc == 'cvt_6ch_kde':
             bev_generator = CVT_6chKDE(device=device)
+        elif arc == 'cvt_6ch_traj':
+            bev_generator = CVT_6chTraj(device=device)
+        elif arc == 'cvt_6ch_traj_cmd':
+            bev_generator = CVT_6chTrajCmd(device=device)
+        elif arc == 'cvt_6ch_traj_cmd_kde':
+            bev_generator = CVT_6chTrajCmdKDE(device=device)
 
     # ==========================================
     # INICIALIZAÇÃO DO BUFFER TEMPORAL
@@ -266,13 +346,16 @@ def evaluate_policy(
 
     _do_iou = save_iou_csv and iou_csv_path is not None and arc != 'expert'
     iou_rows: list = []
+    _overlay_iou: list = None
+    _overlay_maneuver: str = None
+    _overlay_direction: str = None
 
     n_step = 0
     n_timeout = 0
     env_done = np.array([False]*env.num_envs)
     
-    print(f'Starting evaluation for at least {min_eval_steps} steps or until all environments are done...')
-    while n_step < min_eval_steps or not np.all(env_done):
+    print(f'Starting evaluation for exactly {min_eval_steps} steps...')
+    while n_step < min_eval_steps:
         # Captura a BEV real (ground truth) antes de ser sobrescrita
         real_bev = obs.get('birdview', obs.get('topdown', None))
         
@@ -299,6 +382,27 @@ def evaluate_policy(
                     'intrinsics': th.as_tensor(obs['intrinsics'], dtype=th.float32).to(device),
                 }
                 bev = bev_generator.infer(image_input)
+
+            elif arc == 'cvt_6ch_traj':
+                unet = False
+                image_input = {
+                    'image': create_image_tensor_4cam(obs, w_resize=480, h_resize=224).to(device),
+                    'extrinsics': th.as_tensor(obs['extrinsics'], dtype=th.float32).to(device),
+                    'intrinsics': th.as_tensor(obs['intrinsics'], dtype=th.float32).to(device),
+                    'traj': th.as_tensor(obs['traj'], dtype=th.float32).to(device),
+                }
+                bev = bev_generator.infer(image_input)
+
+            elif arc in ('cvt_6ch_traj_cmd', 'cvt_6ch_traj_cmd_kde'):
+                unet = False
+                image_input = {
+                    'image': create_image_tensor_4cam(obs, w_resize=480, h_resize=224).to(device),
+                    'extrinsics': th.as_tensor(obs['extrinsics'], dtype=th.float32).to(device),
+                    'intrinsics': th.as_tensor(obs['intrinsics'], dtype=th.float32).to(device),
+                    'traj': th.as_tensor(obs['traj'], dtype=th.float32).to(device),
+                    'cmd': th.as_tensor(obs['cmd'], dtype=th.float32).to(device),
+                }
+                bev = bev_generator.infer(image_input)
             
             # ==========================================
             # IoU POR PASSO (pred 3ch vs GT 3ch, ambos 192×192 {0,255})
@@ -309,9 +413,24 @@ def evaluate_policy(
                 intersection = (pred_bin * target_bin).sum(dim=(2, 3))
                 union        = pred_bin.sum(dim=(2, 3)) + target_bin.sum(dim=(2, 3)) - intersection
                 iou_per_env  = (intersection / (union + 1e-7))           # (B, 3)
+                _has_traj = 'traj' in obs
+                _has_cmd  = 'command_raw' in obs
                 for b in range(iou_per_env.shape[0]):
                     ious = iou_per_env[b].tolist()
-                    iou_rows.append([n_step * env.num_envs + b] + ious + [sum(ious) / len(ious)])
+                    if _has_traj and _has_cmd:
+                        traj_b = obs['traj'][b]
+                        cmd_b  = obs['command_raw'][b]
+                        maneuver, direction = classify_maneuver(cmd_b, traj_b)
+                    elif _has_traj:
+                        traj_b = obs['traj'][b]
+                        maneuver, direction = classify_maneuver(3, traj_b)
+                    else:
+                        maneuver, direction = ('unknown', 'none')
+                    iou_rows.append([n_step * env.num_envs + b] + ious + [sum(ious) / len(ious), maneuver, direction])
+                    if b == 0:
+                        _overlay_iou = ious
+                        _overlay_maneuver = maneuver
+                        _overlay_direction = direction
 
             # ==========================================
             # APLICAÇÃO DO BUFFER TEMPORAL
@@ -325,7 +444,10 @@ def evaluate_policy(
                 
             # Grava frames para o vídeo BEV+RGB se o diretório foi especificado
             if bev_video_out is not None:
-                frame = compose_frame(obs, bev, real_bev)
+                frame = compose_frame(obs, bev, real_bev,
+                                      iou=_overlay_iou,
+                                      maneuver=_overlay_maneuver,
+                                      direction=_overlay_direction)
 
                 if bev_video_encoder is None:
                     bev_video_encoder = ImageEncoder(
@@ -387,7 +509,7 @@ def evaluate_policy(
         Path(iou_csv_path).parent.mkdir(parents=True, exist_ok=True)
         with open(iou_csv_path, 'w', newline='') as f:
             w = csv.writer(f)
-            w.writerow(['sample_idx', 'iou_ch0', 'iou_ch1', 'iou_ch2', 'mean_iou'])
+            w.writerow(['sample_idx', 'iou_ch0', 'iou_ch1', 'iou_ch2', 'mean_iou', 'maneuver', 'direction'])
             w.writerows(iou_rows)
         print(f"✅ IoU CSV saved: {iou_csv_path} ({len(iou_rows)} steps)")
 

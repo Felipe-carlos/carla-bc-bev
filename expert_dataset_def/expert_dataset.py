@@ -47,13 +47,17 @@ def traj_plotter(traj, img_path=None):
     return image_tensor
 
 
-def get_intrinsics(obs_configs, bev_resize):
+def get_intrinsics(obs_configs, bev_resize, traj_injection=False):
     """
-    Retorna lista de matrizes intrínsecas 3x3 para ['left_rgb', 'central_rgb', 'right_rgb', 'rear_rgb', 'bev']
+    Retorna lista de matrizes intrínsecas 3x3.
+    traj_injection=False: 5 câmeras ['left_rgb', 'central_rgb', 'right_rgb', 'rear_rgb', 'bev']
+    traj_injection=True:  4 câmeras ['left_rgb', 'central_rgb', 'right_rgb', 'rear_rgb']
     """
-    stack_order = ['left_rgb', 'central_rgb', 'right_rgb', 'rear_rgb', 'bev']
-    intrinsics = []
+    stack_order = ['left_rgb', 'central_rgb', 'right_rgb', 'rear_rgb']
+    if not traj_injection:
+        stack_order = stack_order + ['bev']
 
+    intrinsics = []
     for key in stack_order:
         if key in obs_configs['hero']:
             cam = obs_configs['hero'][key]
@@ -62,8 +66,8 @@ def get_intrinsics(obs_configs, bev_resize):
             height = cam['height']
             intrinsics.append(intrinsic_cam(fov, width=width, height=height))
         else:
-            # BEV do traj
-            bev_width = bev_resize 
+            # BEV virtual (só presente quando traj_injection=False)
+            bev_width = bev_resize
             bev_height = bev_width
             pixels_per_meter = obs_configs['hero']['birdview']['pixels_per_meter'] * bev_resize / 192
             intrinsics.append(intrinsic_bev(bev_width, bev_height, pixels_per_meter))
@@ -71,24 +75,28 @@ def get_intrinsics(obs_configs, bev_resize):
     return intrinsics
 
 
-def get_extrinsics(obs_configs, bev_resize):
+def get_extrinsics(obs_configs, bev_resize, traj_injection=False):
     """
-    Retorna lista de matrizes extrínsecas 4x4 para ['left_rgb', 'central_rgb', 'right_rgb', 'rear_rgb', 'bev']
+    Retorna lista de matrizes extrínsecas 4x4.
+    traj_injection=False: 5 câmeras ['left_rgb', 'central_rgb', 'right_rgb', 'rear_rgb', 'bev']
+    traj_injection=True:  4 câmeras ['left_rgb', 'central_rgb', 'right_rgb', 'rear_rgb']
     """
-    stack_order = ['left_rgb', 'central_rgb', 'right_rgb', 'rear_rgb', 'bev']
+    stack_order = ['left_rgb', 'central_rgb', 'right_rgb', 'rear_rgb']
+    if not traj_injection:
+        stack_order = stack_order + ['bev']
+
     extrinsics = []
+    ego_x, ego_y = bev_resize // 2, bev_resize - 40
+    ppm = obs_configs['hero']['birdview']['pixels_per_meter'] * bev_resize / 192
 
     for key in stack_order:
-        ego_x, ego_y = bev_resize // 2, bev_resize - 40  # ego 40 px do fundo
-        ppm = obs_configs['hero']['birdview']['pixels_per_meter'] * bev_resize / 192
-
         if key in obs_configs['hero']:
             cam = obs_configs['hero'][key]
             location = list(cam['location'])
             rotation = list(cam['rotation'])
             T = extrinsic_cam(location, rotation, ego_x, ego_y, bev_resize, bev_resize, ppm)
         else:
-            # BEV virtual
+            # BEV virtual (só presente quando traj_injection=False)
             T = extrinsic_bev(ego_x, ego_y, bev_resize, bev_resize, ppm)
         extrinsics.append(T)
 

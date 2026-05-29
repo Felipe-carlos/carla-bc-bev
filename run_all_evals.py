@@ -22,21 +22,26 @@ PROGRESS_FILE = Path('eval_progress.json')
 # ── Combinações sem temporal buffer ─────────────────────────────────────────
 # arc → lista de checkpoints de policy a avaliar
 ARC_TO_EVAL_NAMES = {
-    'unet':          ['real-bev', 'unet'],        
-    'cvt':           ['real-bev', 'cvt_3ch_L1'],  
-    'cvt_finetuned': ['real-bev'],                
-    'expert':        ['real-bev'],                
-    'cvt_6ch':       ['real-bev','cvt_6ch_vanilla'],  
-    'cvt_6ch_kde':   ['real-bev'],
+    # 'unet':          ['real-bev', 'unet'],        # já avaliado
+    # 'cvt':           ['real-bev', 'cvt_3ch_L1'],  # já avaliado
+    # 'cvt_finetuned': ['real-bev'],                # já avaliado
+    # 'expert':        ['real-bev'],                # já avaliado
+    # 'cvt_6ch':       ['real-bev','cvt_6ch_vanilla'],  # já avaliado
+    # 'cvt_6ch_kde':   ['real-bev'],                # já avaliado
+    # 'cvt_6ch_traj':  ['real-bev'],
+    'cvt_6ch_traj_cmd':     ['real-bev'],
+    'cvt_6ch_traj_cmd_kde': ['real-bev'],
+
 }
 
 # ── Combinações com temporal buffer ─────────────────────────────────────────
 # Policy: ckpts_temporal/ckpt-<eval_name>/ckpt_latest.pth
 ARC_TO_EVAL_NAMES_TEMPORAL = {
-    'cvt':           ['cvt_3ch_L1'],  
-    'cvt_finetuned': ['cvt_3ch_L1'],  
-    'cvt_6ch':       ['cvt_3ch_L1'],  
-    'cvt_6ch_kde':   ['cvt_3ch_L1'],   
+    'cvt':           ['cvt_3ch_L1'],   # já avaliado
+    'cvt_finetuned': ['cvt_3ch_L1'],   # já avaliado
+    'cvt_6ch':       ['cvt_3ch_L1'],   # já avaliado
+    'cvt_6ch_kde':   ['cvt_3ch_L1'],   # já avaliado
+    'cvt_6ch_traj':  ['cvt_3ch_L1'],
 }
 
 
@@ -82,6 +87,13 @@ def make_env_maker(town_name: str, arc: str):
         'weather_group': 'ClearNoon',
     }
 
+    if arc in ('cvt_6ch_traj_cmd', 'cvt_6ch_traj_cmd_kde'):
+        matrices_state = 'matrices_traj_cmd'
+    elif arc == 'cvt_6ch_traj':
+        matrices_state = 'matrices_traj'
+    else:
+        matrices_state = 'matrices'
+
     def _maker():
         cfg = json.load(open('config/carla_config.json', 'r'))
         env = EndlessEnv(
@@ -96,7 +108,7 @@ def make_env_maker(town_name: str, arc: str):
         )
         env = RlBirdviewWrapper(
             env,
-            input_states=['rgb', 'traj', 'state', 'matrices'],
+            input_states=['rgb', 'traj', 'state', matrices_state],
             acc_as_action=True,
         )
         return env
@@ -237,7 +249,7 @@ if __name__ == '__main__':
     print('='*60)
     run_block(ARC_TO_EVAL_NAMES, temporal_buffer=False, progress=progress)
 
-    print('\n' + '='*60)
-    print('  BLOCK 2 — temporal buffer evaluations (CVT only)')
-    print('='*60)
-    run_block(ARC_TO_EVAL_NAMES_TEMPORAL, temporal_buffer=True, progress=progress)
+    # print('\n' + '='*60)
+    # print('  BLOCK 2 — temporal buffer: cvt_6ch_traj')
+    # print('='*60)
+    # run_block(ARC_TO_EVAL_NAMES_TEMPORAL, temporal_buffer=True, progress=progress)

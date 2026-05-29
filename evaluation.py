@@ -18,10 +18,10 @@ from config.obs_config import get_obs_configs
 
 
 TOWN_NAME = 'Town01'
-SAVE_BEV_VIDEO = True
-eval_name = 'real-bev'          
-bev_arc = 'unet'         ###['unet', 'cvt', 'cvt_finetuned', 'expert', 'cvt_6ch']
-temporal_buffer = False
+SAVE_BEV_VIDEO = False
+eval_name = 'cvt_6ch_traj'
+bev_arc = 'cvt_6ch_traj'   ###['unet', 'cvt', 'cvt_finetuned', 'expert', 'cvt_6ch', 'cvt_6ch_traj', 'cvt_6ch_traj_cmd', 'cvt_6ch_traj_cmd_kde']
+temporal_buffer = True
 
 env_configs = {
     'carla_map': TOWN_NAME,
@@ -74,14 +74,18 @@ def env_maker():
     env = EndlessEnv(obs_configs=obs_configs, reward_configs=reward_configs,
                     terminal_configs=terminal_configs, host=cfg['host'], port=cfg['port'],
                     seed=2021, no_rendering=False, **env_configs)
-    env = RlBirdviewWrapper(env,input_states=['rgb', 'traj', 'state', 'matrices'], acc_as_action=True)
+    if bev_arc in ('cvt_6ch_traj_cmd', 'cvt_6ch_traj_cmd_kde'):
+        matrices_state = 'matrices_traj_cmd'
+    elif bev_arc == 'cvt_6ch_traj':
+        matrices_state = 'matrices_traj'
+    else:
+        matrices_state = 'matrices'
+    env = RlBirdviewWrapper(env, input_states=['rgb', 'traj', 'state', matrices_state], acc_as_action=True)
     return env
 
 if __name__ == '__main__':
 
     obs_configs = get_obs_configs(bev_arc)
-
-    env = SubprocVecEnv([env_maker])
 
     observation_space = {}
     shape = (9, 192, 192) if temporal_buffer else (3, 192, 192)
@@ -91,14 +95,12 @@ if __name__ == '__main__':
 
     action_space = gym.spaces.Box(low=np.array([0, -1]), high=np.array([1, 1]), dtype=np.float32)
 
-    
-    # network
     policy_kwargs = {
         'observation_space': observation_space,
         'action_space': action_space,
         'policy_head_arch': [256, 256],
         'features_extractor_entry_point': 'torch_layers:XtMaCNN',
-        'features_extractor_kwargs': {'states_neurons': [256,256]},
+        'features_extractor_kwargs': {'states_neurons': [256, 256]},
         'distribution_entry_point': 'distributions:BetaDistribution',
         'real_bev': eval_name == 'real-bev',
     }
@@ -108,6 +110,8 @@ if __name__ == '__main__':
     policy = AgentPolicy(**policy_kwargs)
     policy.to(device)
 
-    batch_size = 24
-
-    eval_bc(policy, device, env,eval_name=eval_name, bev_arc=bev_arc)
+    for TOWN_NAME in ['Town01', 'Town02']:
+        env_configs['carla_map'] = TOWN_NAME
+        env = SubprocVecEnv([env_maker])
+        eval_bc(policy, device, env, eval_name=eval_name, bev_arc=bev_arc)
+        env.close()

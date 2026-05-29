@@ -136,13 +136,13 @@ class RlBirdviewWrapper(gym.Wrapper):
             observation_space['traj'] = gym.spaces.Box(low=-10.0, high=30.0, shape=(10,), dtype=np.float32)
             observation_space['traj_plot'] = gym.spaces.Box(low=0, high=255, shape=(1, 192, 192), dtype=np.uint8)
             observation_space['traj_plot_rgb'] = gym.spaces.Box(low=0, high=255, shape=(1, 144, 256), dtype=np.uint8)
-        if 'cmd' in self._input_states:
+        if 'cmd' in self._input_states or 'matrices_traj_cmd' in self._input_states:
             observation_space['cmd'] = gym.spaces.Box(low=-10.0, high=30.0, shape=(6,), dtype=np.float32)
         if 'command' in self._input_states:
             observation_space['command'] = gym.spaces.Box(low=-10.0, high=30.0, shape=(1,), dtype=np.float32)
         if 'state' in self._input_states:
             observation_space['state'] = gym.spaces.Box(low=-10.0, high=30.0, shape=(6,), dtype=np.float32)
-        if 'matrices' in self._input_states:
+        if 'matrices' in self._input_states or 'matrices_traj' in self._input_states or 'matrices_traj_cmd' in self._input_states:
             observation_space['extrinsics'] = gym.spaces.Box(
                 low=-np.inf, high=np.inf, shape=(4, 4), dtype=np.float32
             )
@@ -314,39 +314,36 @@ class RlBirdviewWrapper(gym.Wrapper):
 
     @staticmethod
     def process_obs(obs, input_states, train=True):
-        if 'cmd' in input_states or 'command' in input_states:
-            # VOID = -1
-            # LEFT = 1
-            # RIGHT = 2
-            # STRAIGHT = 3
-            # LANEFOLLOW = 4
-            # CHANGELANELEFT = 5
-            # CHANGELANERIGHT = 6
-            command = obs['gnss']['command'][0]
+        # VOID = -1, LEFT = 1, RIGHT = 2, STRAIGHT = 3, LANEFOLLOW = 4
+        raw_command = obs['gnss']['command'][0]
+        command_raw = int(raw_command)
+
+        # Always compute traj_locs for diagnostics (command_raw / traj always in obs_dict)
+        ev_gps = obs['gnss']['gnss']
+        # imu nan bug
+        compass = 0.0 if np.isnan(obs['gnss']['imu'][-1]) else obs['gnss']['imu'][-1]
+        ref_rot_in_global = carla.Rotation(yaw=np.rad2deg(compass)-90.0)
+        ev_loc = gps_util.gps_to_location(ev_gps)
+
+        traj_points = obs['gnss']['traj_points']
+        traj_locs = []
+        point_idx = 0
+        while (point_idx + 1) * 3 <= traj_points.shape[0]:
+            gps_point = traj_points[point_idx * 3:(point_idx + 1) * 3]
+            target_vec_in_global = gps_util.gps_to_location(gps_point) - ev_loc
+            loc_in_ev = trans_utils.vec_global_to_ref(target_vec_in_global, ref_rot_in_global)
+            traj_locs.append(loc_in_ev)
+            point_idx += 1
+
+        gps_point = obs['gnss']['target_gps']
+        target_vec_in_global = gps_util.gps_to_location(gps_point) - ev_loc
+        loc_in_ev = trans_utils.vec_global_to_ref(target_vec_in_global, ref_rot_in_global)
+
+        if 'cmd' in input_states or 'command' in input_states or 'matrices_traj_cmd' in input_states:
+            command = raw_command
             if command < 0:
                 command = 4
             command -= 1
-
-        if 'vec' in input_states or 'traj' in input_states:
-            ev_gps = obs['gnss']['gnss']
-            # imu nan bug
-            compass = 0.0 if np.isnan(obs['gnss']['imu'][-1]) else obs['gnss']['imu'][-1]
-            ref_rot_in_global = carla.Rotation(yaw=np.rad2deg(compass)-90.0)
-            ev_loc = gps_util.gps_to_location(ev_gps)
-
-            traj_points = obs['gnss']['traj_points']
-            traj_locs = []
-            point_idx = 0
-            while (point_idx + 1) * 3 <= traj_points.shape[0]:
-                gps_point = traj_points[point_idx * 3:(point_idx + 1) * 3]
-                target_vec_in_global = gps_util.gps_to_location(gps_point) - ev_loc
-                loc_in_ev = trans_utils.vec_global_to_ref(target_vec_in_global, ref_rot_in_global)
-                traj_locs.append(loc_in_ev)
-                point_idx += 1
-
-            gps_point = obs['gnss']['target_gps']
-            target_vec_in_global = gps_util.gps_to_location(gps_point) - ev_loc
-            loc_in_ev = trans_utils.vec_global_to_ref(target_vec_in_global, ref_rot_in_global)
 
         obs_dict = {}
         if 'speed' in input_states:
@@ -374,15 +371,19 @@ class RlBirdviewWrapper(gym.Wrapper):
         if 'vec' in input_states:
             vec_array = np.array([loc_in_ev.x, loc_in_ev.y])
             obs_dict['vec'] = vec_array
-        if 'traj' in input_states:
-            traj_vec = []
-            for traj_loc_in_ev in traj_locs:
-                traj_vec.extend([traj_loc_in_ev.x / 100.0, traj_loc_in_ev.y / 100.0])
-            obs_dict['traj'] = np.array(traj_vec)
-            obs_dict['traj_plot'] = traj_plotter(obs_dict['traj']) 
-            obs_dict['traj_plot_rgb'] = traj_plotter_rgb(obs_dict['traj']) 
 
-        if 'cmd' in input_states:
+        # Always expose traj and command_raw for diagnostics (classify_maneuver in eval_agent.py)
+        traj_vec = []
+        for traj_loc_in_ev in traj_locs:
+            traj_vec.extend([traj_loc_in_ev.x / 100.0, traj_loc_in_ev.y / 100.0])
+        obs_dict['traj'] = np.array(traj_vec)
+        obs_dict['command_raw'] = np.array([command_raw])
+
+        if 'traj' in input_states:
+            obs_dict['traj_plot'] = traj_plotter(obs_dict['traj'])
+            obs_dict['traj_plot_rgb'] = traj_plotter_rgb(obs_dict['traj'])
+
+        if 'cmd' in input_states or 'matrices_traj_cmd' in input_states:
             cmd_one_hot = [0] * 6
             cmd_one_hot[command] = 1
             cmd_array = np.array(cmd_one_hot)
@@ -397,19 +398,20 @@ class RlBirdviewWrapper(gym.Wrapper):
             state_list.append(obs['control']['gear']/5.0)
             state_list.append(obs['velocity']['vel_xy'])
             obs_dict['state'] = np.concatenate(state_list)
-        if 'matrices' in input_states:
+        if 'matrices' in input_states or 'matrices_traj' in input_states or 'matrices_traj_cmd' in input_states:
             rgb_h = obs['central_rgb']['data'].shape[0]
             rgb_w = obs['central_rgb']['data'].shape[1]
-            
+
             if rgb_w == 480 and rgb_h == 224:
-                bev_resize = 256  # cvt_6ch
+                bev_resize = 256  # cvt_6ch / cvt_6ch_traj
             elif rgb_w == 256 and rgb_h == 256:
                 bev_resize = 256  # cvt
             else:
                 bev_resize = 192  # default/unet
-            
-            extrinsics = get_extrinsics(obs_configs=obs_configs, bev_resize=bev_resize)
-            intrinsics = get_intrinsics(obs_configs=obs_configs, bev_resize=bev_resize)
+
+            traj_injection = 'matrices_traj' in input_states or 'matrices_traj_cmd' in input_states
+            extrinsics = get_extrinsics(obs_configs=obs_configs, bev_resize=bev_resize, traj_injection=traj_injection)
+            intrinsics = get_intrinsics(obs_configs=obs_configs, bev_resize=bev_resize, traj_injection=traj_injection)
             obs_dict.update({
                 'extrinsics': extrinsics,
                 'intrinsics': intrinsics
