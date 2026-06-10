@@ -29,8 +29,9 @@ ARC_TO_EVAL_NAMES = {
     # 'cvt_6ch':       ['real-bev','cvt_6ch_vanilla'],  # já avaliado
     # 'cvt_6ch_kde':   ['real-bev'],                # já avaliado
     # 'cvt_6ch_traj':  ['real-bev'],
-    'cvt_6ch_traj_cmd':     ['real-bev'],
-    'cvt_6ch_traj_cmd_kde': ['real-bev'],
+    # 'cvt_6ch_traj_cmd':         ['real-bev'],
+    # 'cvt_6ch_traj_cmd_kde':     ['real-bev'],
+    'cvt_6ch_vanilla_no_noise': ['real-bev'],
 
 }
 

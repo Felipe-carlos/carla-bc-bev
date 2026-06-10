@@ -10,6 +10,7 @@ from bev_generation.cvt_6ch_kde import CVT_6chKDE
 from bev_generation.cvt_6ch_traj import CVT_6chTraj
 from bev_generation.cvt_6ch_traj_cmd import CVT_6chTrajCmd
 from bev_generation.cvt_6ch_traj_cmd_kde import CVT_6chTrajCmdKDE
+from bev_generation.cvt_6ch_vanilla_no_noise import CVT_6chVanillaNoNoise
 from pathlib import Path
 import cv2
 import torch as th
@@ -273,7 +274,7 @@ def evaluate_policy(
         policy,
         video_path,
         min_eval_steps=3000,
-        arc:Literal['unet', 'cvt', 'cvt_finetuned', 'expert', 'cvt_6ch', 'cvt_6ch_kde', 'cvt_6ch_traj', 'cvt_6ch_traj_cmd', 'cvt_6ch_traj_cmd_kde']='unet',
+        arc:Literal['unet', 'cvt', 'cvt_finetuned', 'expert', 'cvt_6ch', 'cvt_6ch_kde', 'cvt_6ch_traj', 'cvt_6ch_traj_cmd', 'cvt_6ch_traj_cmd_kde', 'cvt_6ch_vanilla_no_noise']='unet',
         video_save_dir: Optional[str] = None,
         temporal_buffer=False,
         save_iou_csv: bool = False,
@@ -307,6 +308,8 @@ def evaluate_policy(
             bev_generator = CVT_6chTrajCmd(device=device)
         elif arc == 'cvt_6ch_traj_cmd_kde':
             bev_generator = CVT_6chTrajCmdKDE(device=device)
+        elif arc == 'cvt_6ch_vanilla_no_noise':
+            bev_generator = CVT_6chVanillaNoNoise(device=device)
 
     # ==========================================
     # INICIALIZAÇÃO DO BUFFER TEMPORAL
@@ -374,7 +377,7 @@ def evaluate_policy(
                 }
                 bev = bev_generator.infer(image_input)
 
-            elif arc in ('cvt_6ch', 'cvt_6ch_kde'):
+            elif arc in ('cvt_6ch', 'cvt_6ch_kde', 'cvt_6ch_vanilla_no_noise'):
                 unet = False
                 image_input = {
                     'image': create_image_tensor(obs,unet=unet,w_resize=480,h_resize=224).to(device),

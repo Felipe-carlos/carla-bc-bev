@@ -5,7 +5,9 @@
         "Town01__real-bev__cvt_6ch_traj_cmd__standard",
         "Town01__real-bev__cvt_6ch_traj_cmd_kde__standard",
         "Town02__real-bev__cvt_6ch_traj_cmd__standard",
-        "Town02__real-bev__cvt_6ch_traj_cmd_kde__standard"
+        "Town02__real-bev__cvt_6ch_traj_cmd_kde__standard",
+        "Town01__real-bev__cvt_6ch_vanilla_no_noise__standard",
+        "Town02__real-bev__cvt_6ch_vanilla_no_noise__standard"
     ],
     "failed": [
         {
