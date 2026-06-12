@@ -242,6 +242,12 @@ class RlBirdviewWrapper(gym.Wrapper):
         done = done_ma[self._ev_id]
         info = info_ma[self._ev_id]
 
+        ev = self.env._ev_handler.ego_vehicles[self._ev_id]
+        t = ev.vehicle.get_transform()
+        info['ev_x'] = float(t.location.x)
+        info['ev_y'] = float(t.location.y)
+        info['ev_yaw'] = float(t.rotation.yaw)
+
         self._render_dict = {
             'timestamp': self.env.timestamp,
             'obs': self._render_dict['prev_obs'],

@@ -48,6 +48,7 @@ def eval_bc(policy, device, env,eval_name, bev_arc='unet'):
         bev_video_path = Path(f'bev_video/{TOWN_NAME.lower()}/{eval_name}_{bev_arc}.mp4')    
 
     eval_video_path = (video_path / f'{eval_name}_{bev_arc}.mp4').as_posix()
+    traj_output_path = (metrics_path / f'{eval_name}_{bev_arc}_traj.json').as_posix()
     avg_ep_stat, avg_route_completion, ep_events = evaluate_policy(
         env,
         policy,
@@ -55,6 +56,8 @@ def eval_bc(policy, device, env,eval_name, bev_arc='unet'):
         arc=bev_arc,
         video_save_dir=bev_video_path,
         temporal_buffer=temporal_buffer,
+        save_traj=True,
+        traj_output_path=traj_output_path,
     )
   
     metrics_folder = 'eval_metrics_temporal' if temporal_buffer else 'eval_metrics'

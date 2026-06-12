@@ -1,0 +1,82 @@
+{
+    "avg_ep_stat": {
+        "eval/score_route": 0.11900946499109269,
+        "eval/score_penalty": 0.7399999999999999,
+        "eval/score_composed": 0.0827523231869936,
+        "eval/length": 325.4,
+        "eval/reward": 165.4944349619891,
+        "eval/timeout": 0.0,
+        "eval/is_route_completed": 0.0,
+        "eval/is_route_completed_nocrash": 0.0,
+        "eval/route_completed_in_km": 0.11900946499109269,
+        "eval/route_length_in_km": 1.241371990463227,
+        "eval/percentage_outside_lane": 0.0,
+        "eval/percentage_wrong_lane": 0.0,
+        "eval/collisions_layout": 8.484652265571862,
+        "eval/collisions_vehicle": 0.0,
+        "eval/collisions_pedestrian": 0.0,
+        "eval/collisions_others": 0.0,
+        "eval/red_light": 4.333929040221091,
+        "eval/light_passed": 0.2,
+        "eval/encounter_light": 0.6,
+        "eval/stop_infraction": 0.0,
+        "eval/stop_passed": 0.0,
+        "eval/encounter_stop": 0.0,
+        "eval/route_dev": 0.0,
+        "eval/vehicle_blocked": 0.0,
+        "eval/completed_n_episodes": 5.0,
+        "eval/eval_timeout": 0,
+        "eval/episodes_summary": [
+            {
+                "episode_idx": 0,
+                "spawn_x": 104.86798095703125,
+                "spawn_y": 1.9501909017562866,
+                "spawn_yaw": 0.0061187744140625,
+                "steps_until_infraction": 129,
+                "infraction_occurred": true
+            },
+            {
+                "episode_idx": 1,
+                "spawn_x": 396.3499450683594,
+                "spawn_y": 318.3823547363281,
+                "spawn_yaw": -90.02226257324219,
+                "steps_until_infraction": 816,
+                "infraction_occurred": true
+            },
+            {
+                "episode_idx": 2,
+                "spawn_x": 13.568599700927734,
+                "spawn_y": 330.5418701171875,
+                "spawn_yaw": 0.03069334849715233,
+                "steps_until_infraction": 209,
+                "infraction_occurred": true
+            },
+            {
+                "episode_idx": 3,
+                "spawn_x": 396.367919921875,
+                "spawn_y": 19.922809600830078,
+                "spawn_yaw": -89.93123626708984,
+                "steps_until_infraction": 146,
+                "infraction_occurred": true
+            },
+            {
+                "episode_idx": 4,
+                "spawn_x": 212.6422882080078,
+                "spawn_y": 195.14991760253906,
+                "spawn_yaw": 180.00465393066406,
+                "steps_until_infraction": 312,
+                "infraction_occurred": true
+            }
+        ],
+        "time/t_eval": 125.36318778991699,
+        "time/fps_eval": 12.858639193998334
+    },
+    "avg_route_completion": {
+        "eval/step": 322.4,
+        "eval/simulation_time": 32.240000480413435,
+        "eval/route_completed_in_m": 119.00946499109268,
+        "eval/route_length_in_m": 1241.3719904632271,
+        "eval/is_route_completed": 0.0,
+        "eval/avg_n_episodes": 5.0
+    }
+}

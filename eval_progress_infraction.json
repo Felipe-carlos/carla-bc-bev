@@ -1,0 +1,29 @@
+{
+    "completed": [
+        "Town01__real-bev__unet__standard",
+        "Town01__unet__unet__standard",
+        "Town01__real-bev__cvt__standard",
+        "Town01__cvt_3ch_L1__cvt__standard",
+        "Town01__real-bev__expert__standard",
+        "Town01__real-bev__cvt_6ch__standard",
+        "Town01__cvt_6ch_vanilla__cvt_6ch__standard",
+        "Town01__real-bev__cvt_6ch_kde__standard",
+        "Town01__real-bev__cvt_6ch_traj__standard",
+        "Town01__real-bev__cvt_6ch_traj_cmd__standard",
+        "Town01__real-bev__cvt_6ch_traj_cmd_kde__standard",
+        "Town01__real-bev__cvt_6ch_vanilla_no_noise__standard",
+        "Town02__real-bev__unet__standard",
+        "Town02__unet__unet__standard",
+        "Town02__real-bev__cvt__standard",
+        "Town02__cvt_3ch_L1__cvt__standard",
+        "Town02__real-bev__expert__standard",
+        "Town02__real-bev__cvt_6ch__standard",
+        "Town02__cvt_6ch_vanilla__cvt_6ch__standard",
+        "Town02__real-bev__cvt_6ch_kde__standard",
+        "Town02__real-bev__cvt_6ch_traj__standard",
+        "Town02__real-bev__cvt_6ch_traj_cmd__standard",
+        "Town02__real-bev__cvt_6ch_traj_cmd_kde__standard",
+        "Town02__real-bev__cvt_6ch_vanilla_no_noise__standard"
+    ],
+    "failed": []
+}

@@ -1,0 +1,18 @@
+{
+    "avg_ep_stat": {
+        "eval/completed_n_episodes": 0.0,
+        "eval/eval_timeout": 0,
+        "eval/steps_until_infraction": 4000,
+        "eval/infraction_occurred": 0.0,
+        "time/t_eval": 219.61015510559082,
+        "time/fps_eval": 18.214093961532694
+    },
+    "avg_route_completion": {
+        "eval/step": 4000.0,
+        "eval/simulation_time": 400.0000059604645,
+        "eval/route_completed_in_m": 1613.1599830379782,
+        "eval/route_length_in_m": 1890.6369741549788,
+        "eval/is_route_completed": 0.0,
+        "eval/avg_n_episodes": 1.0
+    }
+}

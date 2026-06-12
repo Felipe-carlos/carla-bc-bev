@@ -9,7 +9,7 @@ class Unet_BEVGenerator(IBEVGenerator):
     def __init__(self, model_path: str = None, device='cuda', use_eval=True):
         if model_path is None:
             main = os.getcwd()
-            model_path = os.path.join(main, 'bev_generation/unet/l1_50_no sigmoid_generator_49.pth')
+            model_path = os.path.join(main, 'bev_generation/unet/focal_50_generator_49.pth')
         self.device = device
         in_channels = 13
         self.generator = GeneratorUNet(in_channels=in_channels).to(device)

@@ -1,4 +1,5 @@
 import csv
+import json
 import numpy as np
 import time
 from gym.wrappers.monitoring.video_recorder import ImageEncoder
@@ -279,6 +280,8 @@ def evaluate_policy(
         temporal_buffer=False,
         save_iou_csv: bool = False,
         iou_csv_path: Optional[str] = None,
+        save_traj: bool = False,
+        traj_output_path: Optional[str] = None,
     ):
 
     device = 'cuda'
@@ -352,6 +355,9 @@ def evaluate_policy(
     _overlay_iou: list = None
     _overlay_maneuver: str = None
     _overlay_direction: str = None
+
+    traj_log = []
+    _episode_id = [0] * env.num_envs
 
     n_step = 0
     n_timeout = 0
@@ -476,6 +482,25 @@ def evaluate_policy(
 
         list_render.append(env.render(mode='rgb_array'))
 
+        if save_traj:
+            for i in range(env.num_envs):
+                is_infraction_terminal = (
+                    bool(done[i])
+                    and not bool(info[i]['timeout'])
+                    and not bool(info[i]['route_completion']['is_route_completed'])
+                )
+                traj_log.append({
+                    'episode': _episode_id[i],
+                    'step': n_step,
+                    'env_idx': i,
+                    'x': info[i].get('ev_x', float('nan')),
+                    'y': info[i].get('ev_y', float('nan')),
+                    'yaw': info[i].get('ev_yaw', float('nan')),
+                    'is_infraction_terminal': is_infraction_terminal,
+                })
+                if done[i]:
+                    _episode_id[i] += 1
+
         n_step += 1
         env_done |= done
 
@@ -506,6 +531,13 @@ def evaluate_policy(
     if bev_video_encoder is not None:
         bev_video_encoder.close()
         print(f"✅ BEV/RGB video saved successfully: {bev_video_out}")
+
+    # === Salva trajetória com flags de infração ===
+    if save_traj and traj_output_path and traj_log:
+        Path(traj_output_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(traj_output_path, 'w') as f:
+            json.dump(traj_log, f)
+        print(f"Trajectory log saved: {traj_output_path} ({len(traj_log)} steps)")
 
     # === Salva CSV de IoU por passo ===
     if _do_iou and iou_rows:

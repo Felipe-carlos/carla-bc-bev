@@ -1,0 +1,58 @@
+{
+    "avg_ep_stat": {
+        "eval/completed_n_episodes": 0.0,
+        "eval/eval_timeout": 0,
+        "eval/episodes_summary": [
+            {
+                "episode_idx": 0,
+                "spawn_x": 104.86798095703125,
+                "spawn_y": 1.9501909017562866,
+                "spawn_yaw": 0.0061187744140625,
+                "steps_until_infraction": 1500,
+                "infraction_occurred": false
+            },
+            {
+                "episode_idx": 1,
+                "spawn_x": 396.3499450683594,
+                "spawn_y": 318.3823547363281,
+                "spawn_yaw": -90.02226257324219,
+                "steps_until_infraction": 1500,
+                "infraction_occurred": false
+            },
+            {
+                "episode_idx": 2,
+                "spawn_x": 13.568599700927734,
+                "spawn_y": 330.5418701171875,
+                "spawn_yaw": 0.03069334849715233,
+                "steps_until_infraction": 1500,
+                "infraction_occurred": false
+            },
+            {
+                "episode_idx": 3,
+                "spawn_x": 396.367919921875,
+                "spawn_y": 19.922809600830078,
+                "spawn_yaw": -89.93123626708984,
+                "steps_until_infraction": 1500,
+                "infraction_occurred": false
+            },
+            {
+                "episode_idx": 4,
+                "spawn_x": 212.6422882080078,
+                "spawn_y": 195.14991760253906,
+                "spawn_yaw": 180.00465393066406,
+                "steps_until_infraction": 1500,
+                "infraction_occurred": false
+            }
+        ],
+        "time/t_eval": 455.88604187965393,
+        "time/fps_eval": 16.451479780071598
+    },
+    "avg_route_completion": {
+        "eval/step": 1500.0,
+        "eval/simulation_time": 150.00000223517418,
+        "eval/route_completed_in_m": 598.2599739522636,
+        "eval/route_length_in_m": 1241.3719904632271,
+        "eval/is_route_completed": 0.0,
+        "eval/avg_n_episodes": 5.0
+    }
+}

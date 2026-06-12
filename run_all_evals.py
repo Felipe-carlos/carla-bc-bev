@@ -10,27 +10,52 @@ from carla_gym.envs import EndlessEnv
 from rl_birdview_wrapper import RlBirdviewWrapper
 from data_collect import reward_configs, terminal_configs
 from eval_agent import evaluate_policy
+from eval_agent_infraction import (
+    evaluate_policy_until_infraction,
+    evaluate_policy_N_spawns,
+    select_spread_spawns,
+)
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from config.obs_config import get_obs_configs
 
 
 TOWNS = ['Town01', 'Town02'] #town02 já foi avaliado — focar no town01 para análises mais detalhadas
-SAVE_BEV_VIDEO = True
+SAVE_BEV_VIDEO = False
+SAVE_TRAJ = True
 DEVICE = 'cuda'
-PROGRESS_FILE = Path('eval_progress.json')
+
+# ── Eval mode ────────────────────────────────────────────────────────────────
+# N_SPAWN_EPISODES > 0  → evaluate_policy_N_spawns  (N episodes, each from a
+#                         different spread spawn, stops at infraction or
+#                         MAX_EPISODE_STEPS; all agents share the same spawns)
+# N_SPAWN_EPISODES == 0 + EVAL_UNTIL_INFRACTION=True  → single infraction eval
+# N_SPAWN_EPISODES == 0 + EVAL_UNTIL_INFRACTION=False → fixed 3000-step eval
+N_SPAWN_EPISODES = 0 #5
+MAX_EPISODE_STEPS = 1500
+EVAL_SEED = 2021                  # reused for every episode so routes are identical
+
+EVAL_UNTIL_INFRACTION = False
+MAX_INFRACTION_STEPS = 4000
+
+if N_SPAWN_EPISODES > 0:
+    PROGRESS_FILE = Path('eval_progress_spawns.json')
+elif EVAL_UNTIL_INFRACTION:
+    PROGRESS_FILE = Path('eval_progress_infraction.json')
+else:
+    PROGRESS_FILE = Path('eval_progress.json')
 
 # ── Combinações sem temporal buffer ─────────────────────────────────────────
 # arc → lista de checkpoints de policy a avaliar
 ARC_TO_EVAL_NAMES = {
-    # 'unet':          ['real-bev', 'unet'],        # já avaliado
-    # 'cvt':           ['real-bev', 'cvt_3ch_L1'],  # já avaliado
+    'unet':          ['real-bev', 'unet'],        # já avaliado
+    'cvt':           ['real-bev', 'cvt_3ch_L1'],  # já avaliado
     # 'cvt_finetuned': ['real-bev'],                # já avaliado
-    # 'expert':        ['real-bev'],                # já avaliado
-    # 'cvt_6ch':       ['real-bev','cvt_6ch_vanilla'],  # já avaliado
-    # 'cvt_6ch_kde':   ['real-bev'],                # já avaliado
-    # 'cvt_6ch_traj':  ['real-bev'],
-    # 'cvt_6ch_traj_cmd':         ['real-bev'],
-    # 'cvt_6ch_traj_cmd_kde':     ['real-bev'],
+    'expert':        ['real-bev'],                # já avaliado
+    'cvt_6ch':       ['real-bev','cvt_6ch_vanilla'],  # já avaliado
+    'cvt_6ch_kde':   ['real-bev'],                # já avaliado
+    'cvt_6ch_traj':  ['real-bev'],
+    'cvt_6ch_traj_cmd':         ['real-bev'],
+    'cvt_6ch_traj_cmd_kde':     ['real-bev'],
     'cvt_6ch_vanilla_no_noise': ['real-bev'],
 
 }
@@ -143,6 +168,7 @@ def build_policy(eval_name: str, temporal_buffer: bool = False) -> AgentPolicy:
 def run_single_eval(
     env, policy, town_name: str, eval_name: str, bev_arc: str,
     temporal_buffer: bool = False,
+    spawn_points: list = None,
 ):
     ckpt_folder = 'ckpts_temporal' if temporal_buffer else 'ckpts'
     ckpt_path = Path(f'{ckpt_folder}/ckpt-{eval_name}/ckpt_latest.pth')
@@ -158,27 +184,65 @@ def run_single_eval(
     if SAVE_BEV_VIDEO and not temporal_buffer:
         bev_video_path = Path(f'bev_video/{town_name.lower()}/{eval_name}_{bev_arc}.mp4')
 
-    save_iou = not temporal_buffer and bev_arc != 'expert'
+    save_iou = not temporal_buffer and bev_arc != 'expert' and spawn_points is None
     iou_csv_path = None
     if save_iou:
         iou_dir = Path(f'eval/{town_name.lower()}')
         iou_dir.mkdir(parents=True, exist_ok=True)
         iou_csv_path = str(iou_dir / f'{eval_name}_{bev_arc}.csv')
 
-    avg_ep_stat, avg_route_completion, ep_events = evaluate_policy(
-        env,
-        policy,
-        eval_video_path,
-        arc=bev_arc,
-        video_save_dir=bev_video_path,
-        temporal_buffer=temporal_buffer,
-        save_iou_csv=save_iou,
-        iou_csv_path=iou_csv_path,
-    )
-
-    metrics_folder = 'eval_metrics_temporal' if temporal_buffer else 'eval_metrics'
+    if spawn_points is not None:
+        metrics_folder = 'eval_metrics_spawns'
+    elif EVAL_UNTIL_INFRACTION:
+        metrics_folder = 'eval_metrics_infraction'
+    elif temporal_buffer:
+        metrics_folder = 'eval_metrics_temporal'
+    else:
+        metrics_folder = 'eval_metrics'
     metrics_path = Path(f'{metrics_folder}/{town_name.lower()}')
     metrics_path.mkdir(parents=True, exist_ok=True)
+    traj_output_path = str(metrics_path / 'trajectories' / f'{eval_name}_{bev_arc}.json') if SAVE_TRAJ else None
+
+    if spawn_points is not None:
+        avg_ep_stat, avg_route_completion, ep_events = evaluate_policy_N_spawns(
+            env,
+            policy,
+            eval_video_path,
+            spawn_points=spawn_points,
+            max_episode_steps=MAX_EPISODE_STEPS,
+            arc=bev_arc,
+            video_save_dir=bev_video_path,
+            temporal_buffer=temporal_buffer,
+            save_traj=SAVE_TRAJ,
+            traj_output_path=traj_output_path,
+            eval_seed=EVAL_SEED,
+        )
+    elif EVAL_UNTIL_INFRACTION:
+        avg_ep_stat, avg_route_completion, ep_events = evaluate_policy_until_infraction(
+            env,
+            policy,
+            eval_video_path,
+            max_eval_steps=MAX_INFRACTION_STEPS,
+            arc=bev_arc,
+            video_save_dir=bev_video_path,
+            temporal_buffer=temporal_buffer,
+            save_traj=SAVE_TRAJ,
+            traj_output_path=traj_output_path,
+        )
+    else:
+        avg_ep_stat, avg_route_completion, ep_events = evaluate_policy(
+            env,
+            policy,
+            eval_video_path,
+            arc=bev_arc,
+            video_save_dir=bev_video_path,
+            temporal_buffer=temporal_buffer,
+            save_iou_csv=save_iou,
+            iou_csv_path=iou_csv_path,
+            save_traj=SAVE_TRAJ,
+            traj_output_path=traj_output_path,
+        )
+
     out_file = metrics_path / f'{eval_name}_{bev_arc}.json'
     with open(out_file, 'w') as f:
         json.dump(
@@ -207,6 +271,16 @@ def run_block(arc_map: dict, temporal_buffer: bool, progress: dict):
             print(f'\n[{label} {done}/{total}] Creating env — town={town_name}, arc={bev_arc}')
             env = SubprocVecEnv([make_env_maker(town_name, bev_arc)])
 
+            # Select spread spawn points once per env — all models in this block
+            # will use the exact same N spawns for a fair comparison.
+            spawn_points = None
+            if N_SPAWN_EPISODES > 0:
+                candidates = env.env_method('get_spawn_candidates')[0]
+                spawn_points = select_spread_spawns(candidates, N_SPAWN_EPISODES, seed=EVAL_SEED)
+                print(f'  Spawn points selected ({N_SPAWN_EPISODES}):')
+                for k, sp in enumerate(spawn_points):
+                    print(f'    [{k}] x={sp["x"]:8.1f}  y={sp["y"]:8.1f}  yaw={sp["yaw"]:6.1f}')
+
             try:
                 for eval_name in eval_names:
                     done += 1
@@ -219,11 +293,12 @@ def run_block(arc_map: dict, temporal_buffer: bool, progress: dict):
                         f'policy={eval_name}, arc={bev_arc}, town={town_name}'
                     )
                     try:
-                        env.env_method('reset_rng', 2021)
+                        env.env_method('reset_rng', EVAL_SEED)
                         policy = build_policy(eval_name, temporal_buffer=temporal_buffer)
                         run_single_eval(
                             env, policy, town_name, eval_name, bev_arc,
                             temporal_buffer=temporal_buffer,
+                            spawn_points=spawn_points,
                         )
                         mark_completed(progress, town_name, eval_name, bev_arc, temporal_buffer)
                     except Exception as e:

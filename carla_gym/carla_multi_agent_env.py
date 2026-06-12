@@ -60,6 +60,28 @@ class CarlaMultiAgentEnv(gym.Env):
         set_random_seed(seed, using_cuda=True)
         self._tm.set_random_device_seed(seed)
 
+    def get_spawn_candidates(self):
+        """Return all valid spawn points as plain dicts (picklable for SubprocVecEnv)."""
+        return [
+            {
+                'x': t.location.x,
+                'y': t.location.y,
+                'z': t.location.z,
+                'yaw': t.rotation.yaw,
+                'road_id': road_id,
+            }
+            for road_id, t in self._ev_handler._spawn_transforms
+        ]
+
+    def set_start_spawn(self, x, y, z, yaw):
+        """Fix the spawn point for the next env.reset(). Call before reset()."""
+        import carla
+        transform = carla.Transform(
+            carla.Location(x=x, y=y, z=z),
+            carla.Rotation(yaw=yaw),
+        )
+        self._task['ego_vehicles']['routes']['hero'] = [transform]
+
     @property
     def num_tasks(self):
         return len(self._all_tasks)
