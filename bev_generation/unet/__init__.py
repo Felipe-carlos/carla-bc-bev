@@ -28,7 +28,8 @@ class Unet_BEVGenerator(IBEVGenerator):
         """No-gradient inference. Returns binarized BEV (B, 3, H, W) with values in {0, 255}."""
         with torch.no_grad():
             logits = self.generator(obs_dict['image'])
-            bev = (logits).byte() * 255  # logit > 0 ↔ sigmoid > 0.5
+            
+            bev = (logits>0.5).byte() * 255  # logit > 0 ↔ sigmoid > 0.5
         return bev
 
     def forward_train(self, obs_dict):

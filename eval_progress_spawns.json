@@ -20,10 +20,15 @@
         "Town02__real-bev__cvt_6ch_traj_cmd__standard",
         "Town02__real-bev__cvt_6ch_traj_cmd_kde__standard",
         "Town02__real-bev__cvt_6ch_vanilla_no_noise__standard",
-        "Town01__real-bev__unet__standard",
         "Town01__unet__unet__standard",
-        "Town02__real-bev__unet__standard",
-        "Town02__unet__unet__standard"
+        "Town02__unet__unet__standard",
+        "Town01__real-bev__unet__standard",
+        "Town02__real-bev__unet__standard"
     ],
-    "failed": []
+    "failed": [
+        {
+            "key": "Town01__real-bev__unet__standard",
+            "error": "Traceback (most recent call last):\n  File \"/home/felipe_cds/carla-bc-bev/run_all_evals.py\", line 298, in run_block\n    run_single_eval(\n  File \"/home/felipe_cds/carla-bc-bev/run_all_evals.py\", line 207, in run_single_eval\n    avg_ep_stat, avg_route_completion, ep_events = evaluate_policy_N_spawns(\n  File \"/home/felipe_cds/carla-bc-bev/eval_agent_infraction.py\", line 395, in evaluate_policy_N_spawns\n    obs, reward, done, info = env.step(actions)\n  File \"/home/felipe_cds/carla-bc-bev/.venv/lib/python3.8/site-packages/stable_baselines3/common/vec_env/base_vec_env.py\", line 162, in step\n    return self.step_wait()\n  File \"/home/felipe_cds/carla-bc-bev/.venv/lib/python3.8/site-packages/stable_baselines3/common/vec_env/subproc_vec_env.py\", line 120, in step_wait\n    results = [remote.recv() for remote in self.remotes]\n  File \"/home/felipe_cds/carla-bc-bev/.venv/lib/python3.8/site-packages/stable_baselines3/common/vec_env/subproc_vec_env.py\", line 120, in <listcomp>\n    results = [remote.recv() for remote in self.remotes]\n  File \"/home/felipe_cds/.pyenv/versions/3.8.19/lib/python3.8/multiprocessing/connection.py\", line 250, in recv\n    buf = self._recv_bytes()\n  File \"/home/felipe_cds/.pyenv/versions/3.8.19/lib/python3.8/multiprocessing/connection.py\", line 414, in _recv_bytes\n    buf = self._recv(4)\n  File \"/home/felipe_cds/.pyenv/versions/3.8.19/lib/python3.8/multiprocessing/connection.py\", line 383, in _recv\n    raise EOFError\nEOFError\n"
+        }
+    ]
 }

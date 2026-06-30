@@ -21,3 +21,5 @@ runs/
 CLAUDE.md
 *.pth
 *.mp4
+plot_city/plot_traj
+plot_city/bev_snapshots

@@ -30,7 +30,7 @@ DEVICE = 'cuda'
 #                         MAX_EPISODE_STEPS; all agents share the same spawns)
 # N_SPAWN_EPISODES == 0 + EVAL_UNTIL_INFRACTION=True  → single infraction eval
 # N_SPAWN_EPISODES == 0 + EVAL_UNTIL_INFRACTION=False → fixed 3000-step eval
-N_SPAWN_EPISODES = 0 #5
+N_SPAWN_EPISODES = 5
 MAX_EPISODE_STEPS = 1500
 EVAL_SEED = 2021                  # reused for every episode so routes are identical
 

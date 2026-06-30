@@ -43,7 +43,7 @@ MODELS = [
 MODEL_LABELS = {
     'cvt_3ch_L1_cvt':                  'CVT 3 ch.',
     'real-bev_unet':                   'UNet',
-    'real-bev_expert':                 'Expert',
+    'real-bev_expert':                 'Real BEV',
     'real-bev_cvt_6ch_vanilla_no_noise': 'CVT 6 ch. no noise ',
     'real-bev_cvt_6ch':                'CVT 6 ch.',
     'real-bev_cvt_6ch_kde':            'CVT 6 ch. KDE',
@@ -62,11 +62,17 @@ DRAW_SCALE = 1.6   # global multiplier for all drawing sizes (arrows, dots, mark
 
 TRAJ_STEP       = 10   # draw one trajectory dot every N steps
 
+# Each model is offset by JIGGLE pixels in a unique angular direction so
+# overlapping paths and arrows from different models remain distinguishable.
+# Set to 0 to disable.
+JIGGLE = 5
+
 # Base sizes — multiplied by DRAW_SCALE at runtime
 _DOT_RADIUS       = 2
-_ARROW_LENGTH     = 14
-_ARROW_HEAD       = 12
-_START_DOT_RADIUS = 8
+_ARROW_LENGTH     = 20
+_ARROW_HEAD       = 18
+
+_START_DOT_RADIUS = 12
 _EPISODE_FONT_SZ  = 30  # balloon label font size (also multiplied by DRAW_SCALE)
 
 LEGEND_ITEM_H   = 100   # pixels per legend row
@@ -76,11 +82,11 @@ LEGEND_FONT_SZ  = 45   # legend font size
 # Fixed colour per model stem — add new stems here as needed
 MODEL_COLORS = {
     'cvt_3ch_L1_cvt':                   (220,  50,  50),  # red
-    'real-bev_unet':                     ( 50, 130, 255),  # blue
-    'real-bev_expert':                   ( 50, 190,  70),  # green
-    'real-bev_cvt_6ch_vanilla_no_noise': (255, 160,   0),  # orange
-    'real-bev_cvt_6ch':                  (170,  60, 220),  # purple
-    'real-bev_cvt_6ch_kde':              (255,  90, 170),  # pink 
+    'real-bev_unet':                     ( 50, 0, 255),  # blue
+    'real-bev_expert':                   (255,  90, 255),  # pink  
+    'real-bev_cvt_6ch_vanilla_no_noise': (255, 255,   0),  # orange
+    'real-bev_cvt_6ch':                  (255, 120, 0  ),  # orange
+    'real-bev_cvt_6ch_kde':              ( 50, 190,  70),  # green
     'real-bev_cvt_6ch_traj':             (  0, 155, 110),  # teal
     'real-bev_cvt_6ch_traj_cmd':         (210, 185,   0),  # yellow
     'real-bev_cvt_6ch_traj_cmd_kde':     (255, 130,  50),  # amber
@@ -276,7 +282,7 @@ def make_side_legend(height):
     pad = 24
     item_gap = LEGEND_ITEM_H + 10
 
-    labels = ['Início de rota', 'Final de rota', 'Infração']
+    labels = ['Route Start', 'Route Finish', 'Infraction']
     max_tw = max(_text_size(font, lbl)[0] for lbl in labels)
     side_w = pad + 2*r + 4 + 12 + max_tw + pad
 
@@ -285,9 +291,9 @@ def make_side_legend(height):
 
     items = [
         # (fill, outline, draw_arrow_flag, label)
-        ((0,   0,   0),   (255, 255, 255), False, 'Início de rota'),
-        ((255, 255, 255), (0,   0,   0),   False, 'Final de rota'),
-        (None,            None,            True,  'Infração'),
+        ((0,   0,   0),   (255, 255, 255), False, 'Route Start'),
+        ((255, 255, 255), (0,   0,   0),   False, 'Route Finish'),
+        (None,            None,            True,  'Infraction'),
     ]
 
     y0 = (height - len(items) * item_gap) // 2
@@ -297,13 +303,13 @@ def make_side_legend(height):
         cx = pad + r + 2
         if is_arrow:
             # draw a representative arrow in white
-            draw_arrow(d, cx - r, cy, 0, 2 * r, r, (220, 220, 220))
+            draw_arrow(d, cx - r, cy, 0, 2 * r, r, (0, 0, 0))
         else:
             ro = r + 2
             d.ellipse([cx-ro, cy-ro, cx+ro, cy+ro], fill=outline)
             d.ellipse([cx-r,  cy-r,  cx+r,  cy+r],  fill=fill)
         tw, th = _text_size(font, label)
-        d.text((cx + r + 14, cy - th // 2), label, fill=(220, 220, 220), font=font)
+        d.text((cx + r + 14, cy - th // 2), label, fill=(0, 0, 0), font=font)
 
     return strip, side_w
 
@@ -344,7 +350,7 @@ def add_legend(image, model_names, colors):
         d.rectangle([x0, y0, x0 + LEGEND_SWATCH, y0 + LEGEND_SWATCH], fill=color)
         draw_arrow(d, x0 + LEGEND_SWATCH // 2, y0 + LEGEND_SWATCH // 2,
                    0, LEGEND_SWATCH // 2, 4, (255, 255, 255))
-        d.text((x0 + LEGEND_SWATCH + 8, y0 + 2), name, fill=(220, 220, 220), font=font)
+        d.text((x0 + LEGEND_SWATCH + 8, y0 + 2), name, fill=(0, 0, 0), font=font)
 
     # ── make map borders transparent ─────────────────────────────────────────
     img_rgba = image.convert('RGBA')
@@ -434,15 +440,25 @@ def process_town(town_dir: Path, town_name: str, client, output_path: Path):
             colors.append(_FALLBACK_PALETTE[_fb_idx % len(_FALLBACK_PALETTE)])
             _fb_idx += 1
 
+    # Per-model jiggle offsets: spread models evenly around a circle of radius JIGGLE
+    n_models = len(model_names)
+    jiggle_offsets = [
+        (
+            JIGGLE * math.cos(i * 2 * math.pi / n_models),
+            JIGGLE * math.sin(i * 2 * math.pi / n_models),
+        )
+        for i in range(n_models)
+    ]
+
     # ── draw trajectories (dots, subsampled) ──────────────────────────────────
-    for color, (name, traj) in zip(colors, models.items()):
+    for (jx, jy), color, (name, traj) in zip(jiggle_offsets, colors, models.items()):
         for i, p in enumerate(traj):
             if p['is_infraction_terminal']:
                 continue
             if i % TRAJ_STEP != 0:
                 continue
             px, py = world_to_pixel(p['x'], p['y'], camera_x, camera_y, mtp)
-            draw_dot(draw, px, py, dot_r, color)
+            draw_dot(draw, px + jx, py + jy, dot_r, color)
 
     # ── draw episode start markers (black fill, white outline, per-episode shape) ──
     for name, traj in models.items():
@@ -454,7 +470,7 @@ def process_town(town_dir: Path, town_name: str, client, output_path: Path):
             seen_episodes.add(ep)
             px, py = world_to_pixel(p['x'], p['y'], camera_x, camera_y, mtp)
             draw_marker(draw, px, py, start_r,
-                        fill_color=(0, 0, 0), outline_color=(255, 255, 255),
+                        fill_color=(15, 15, 15), outline_color=(255, 255, 255),
                         episode_idx=ep)
 
     # ── draw non-infraction episode ends (white fill, black outline, per-episode shape) ──
@@ -469,16 +485,16 @@ def process_town(town_dir: Path, town_name: str, client, output_path: Path):
                 continue
             px, py = world_to_pixel(last['x'], last['y'], camera_x, camera_y, mtp)
             draw_marker(draw, px, py, start_r,
-                        fill_color=(255, 255, 255), outline_color=(0, 0, 0),
+                        fill_color=(255, 255, 255), outline_color=(15, 15, 15),
                         episode_idx=ep_id)
 
     # ── draw infraction arrows on top ─────────────────────────────────────────
-    for color, (name, traj) in zip(colors, models.items()):
+    for (jx, jy), color, (name, traj) in zip(jiggle_offsets, colors, models.items()):
         for p in traj:
             if not p['is_infraction_terminal']:
                 continue
             px, py = world_to_pixel(p['x'], p['y'], camera_x, camera_y, mtp)
-            draw_arrow(draw, px, py, p['yaw'], arrow_len, arrow_head, color)
+            draw_arrow(draw, px + jx, py + jy, p['yaw'], arrow_len, arrow_head, color)
 
     # ── legend ────────────────────────────────────────────────────────────────
     image = add_legend(image, model_names, colors)
